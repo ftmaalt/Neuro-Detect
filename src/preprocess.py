@@ -1,7 +1,6 @@
 import os
 import cv2
 import numpy as np
-from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 def load_image(path):
@@ -17,8 +16,7 @@ def resize_image(image, width, height):
 
 def normalize_image(image):
     """Normalize the image data to the range [0, 1]."""
-    image = image.astype(np.float32) / 255.0  # Normalizing directly
-    return image
+    return image.astype(np.float32) / 255.0
 
 def remove_noise(image):
     """Remove noise from the image using Gaussian Blur."""
@@ -58,15 +56,6 @@ def create_data_generators(train_dir, test_dir, img_size, batch_size):
     )
 
     return train_generator, test_generator
-
-def preprocess_image(path, width, height):
-    """Load, preprocess, and augment the image."""
-    image = load_image(path)
-    image = resize_image(image, width, height)
-    image = normalize_image(image)
-    image = remove_noise(image)
-    image = enhance_contrast(image)
-    return image
 
 def get_class_map(generator):
     """Get a dictionary mapping classes to human-readable names."""
