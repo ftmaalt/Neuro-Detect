@@ -5,7 +5,7 @@ from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 def load_image(path):
-    """Load an image from a specified path."""
+    """Load an image from a specified path and handle errors."""
     image = cv2.imread(path)
     if image is None:
         raise FileNotFoundError(f"Image not found at {path}")
@@ -17,9 +17,7 @@ def resize_image(image, width, height):
 
 def normalize_image(image):
     """Normalize the image data to the range [0, 1]."""
-    scaler = MinMaxScaler()
-    image = image.astype(np.float32)
-    image = scaler.fit_transform(image.reshape(-1, image.shape[-1])).reshape(image.shape)
+    image = image.astype(np.float32) / 255.0  # Normalizing directly
     return image
 
 def remove_noise(image):
@@ -31,7 +29,7 @@ def enhance_contrast(image):
     return cv2.convertScaleAbs(image, alpha=1.5, beta=0)
 
 def create_data_generators(train_dir, test_dir, img_size, batch_size):
-    """Create image data generators for training and testing."""
+    """Create image data generators for training and testing with augmentation."""
     datagen = ImageDataGenerator(
         rescale=1./255,
         rotation_range=30,
@@ -62,7 +60,7 @@ def create_data_generators(train_dir, test_dir, img_size, batch_size):
     return train_generator, test_generator
 
 def preprocess_image(path, width, height):
-    """Load, preprocess, and augment the image for single image use."""
+    """Load, preprocess, and augment the image."""
     image = load_image(path)
     image = resize_image(image, width, height)
     image = normalize_image(image)
