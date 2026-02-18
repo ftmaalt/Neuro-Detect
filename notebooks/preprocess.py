@@ -1,3 +1,7 @@
+"since moved to notebooks incase fails running-might remove it"
+import sys
+sys.path.append(".")
+
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 
