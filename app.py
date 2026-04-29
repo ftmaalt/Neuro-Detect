@@ -113,7 +113,7 @@ def apply_style(theme):
 apply_style(st.session_state.theme)
 
 # load asset
-MODEL_PATH = 'models/baseline_cnn.keras'
+MODEL_PATH = 'models/phase2.keras'
 CLASS_NAMES = ['Glioma Tumor', 'Meningioma Tumor', 'No Tumor', 'Pituitary Tumor']
 
 @st.cache_resource
