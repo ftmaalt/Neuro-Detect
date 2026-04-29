@@ -1,6 +1,7 @@
 import streamlit as st
 import tensorflow as tf
 from PIL import Image
+from pathlib import Path
 import numpy as np
 import os
 import base64
@@ -113,13 +114,14 @@ def apply_style(theme):
 apply_style(st.session_state.theme)
 
 # load asset
-MODEL_PATH = 'models/phase2.keras'
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_PATH = BASE_DIR / "models" / "phase2.keras"
 CLASS_NAMES = ['Glioma Tumor', 'Meningioma Tumor', 'No Tumor', 'Pituitary Tumor']
 
 @st.cache_resource
 def load_neuro_model():
-    if os.path.exists(MODEL_PATH):
-        return tf.keras.models.load_model(MODEL_PATH, compile=False)
+    if MODEL_PATH.exists():
+        return tf.keras.models.load_model(str(MODEL_PATH), compile=False)
     return None
 
 model = load_neuro_model()
@@ -266,15 +268,20 @@ elif st.session_state.view == 'portal':
         st.image(image, caption="Current Patient Scan", use_container_width=True)
         
         if st.button("🧠 INITIATE NEURAL DIAGNOSTIC"):
-            if model:
+            if model is None:
+                st.error(f"Model not found at: {MODEL_PATH}")
+            else:
                 with st.status("🧬 Analyzing Neural Patterns...", expanded=True) as status:
                     st.write("Isolating region of interest...")
-                    img = image.convert('RGB').resize((224, 224))
-                    img_array = np.array(img) / 255.0
+
+                    img = image.convert("RGB").resize((256, 256))
+                    img_array = np.array(img).astype("float32")
                     img_array = np.expand_dims(img_array, axis=0)
+
                     time.sleep(0.5)
                     st.write("Extracting deep features...")
                     preds = model.predict(img_array)
+
                     time.sleep(0.5)
                     st.write("Classifying pathology...")
                     idx = np.argmax(preds[0])
