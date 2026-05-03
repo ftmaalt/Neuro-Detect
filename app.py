@@ -1,3 +1,5 @@
+import sys
+
 import streamlit as st
 import tensorflow as tf
 from PIL import Image
@@ -288,8 +290,8 @@ elif st.session_state.view == 'portal':
                     idx = np.argmax(preds[0])
                     confidence = np.max(preds[0]) * 100
                     if confidence < 75:
-    print("Invalid scan. Please upload a correct brain MRI scan with the appropriate format.")
-    return  
+                        print("Invalid scan. Please upload a correct brain MRI scan with the appropriate format.")
+                        sys.exit(1)
                     status.update(label="✅ Analysis Complete", state="complete", expanded=False)
 
                 brain_placeholder = st.empty()
