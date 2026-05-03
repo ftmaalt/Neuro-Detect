@@ -271,7 +271,7 @@ elif st.session_state.view == 'portal':
               if model is None:
                 st.error(f"Model not found at: {MODEL_PATH}")
      
-            else:
+        else:
                 with st.status("🧬 Analyzing Neural Patterns...", expanded=True) as status:
                     st.write("Isolating region of interest...")
 
