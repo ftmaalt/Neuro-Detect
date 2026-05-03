@@ -268,8 +268,9 @@ elif st.session_state.view == 'portal':
         st.image(image, caption="Current Patient Scan", use_container_width=True)
         
         if st.button("🧠 INITIATE NEURAL DIAGNOSTIC"):
-            if model is None:
+              if model is None:
                 st.error(f"Model not found at: {MODEL_PATH}")
+     
             else:
                 with st.status("🧬 Analyzing Neural Patterns...", expanded=True) as status:
                     st.write("Isolating region of interest...")
@@ -286,6 +287,10 @@ elif st.session_state.view == 'portal':
                     st.write("Classifying pathology...")
                     idx = np.argmax(preds[0])
                     confidence = np.max(preds[0]) * 100
+   if confidence < 75:
+    raise Exception(
+        "Invalid scan. Please upload a correct brain MRI scan with the appropriate format."
+    )
                     status.update(label="✅ Analysis Complete", state="complete", expanded=False)
 
                 brain_placeholder = st.empty()
