@@ -290,9 +290,12 @@ elif st.session_state.view == 'portal':
                     idx = np.argmax(preds[0])
                     confidence = np.max(preds[0]) * 100
                     if confidence < 75:
-                        print("Invalid scan. Please upload a correct brain MRI scan with the appropriate format.")
-                        sys.exit(1)
-                    status.update(label="✅ Analysis Complete", state="complete", expanded=False)
+                        status.update(label="❌ Invalid Scan", state="error", expanded=False)
+    st.error("Invalid scan. Please upload a correct brain MRI scan.")
+    st.stop()
+    status.update(label="✅ Analysis Complete", state="complete", expanded=False)
+               
+            
 
                 brain_placeholder = st.empty()
                 brain_placeholder.markdown('<div class="brain-overlay">🧠</div>', unsafe_allow_html=True)
