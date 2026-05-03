@@ -291,9 +291,9 @@ elif st.session_state.view == 'portal':
                     confidence = np.max(preds[0]) * 100
                     if confidence < 75:
                         status.update(label="❌ Invalid Scan", state="error", expanded=False)
-    st.error("Invalid scan. Please upload a correct brain MRI scan.")
-    st.stop()
-    status.update(label="✅ Analysis Complete", state="complete", expanded=False)
+                        st.error("Invalid scan. Please upload a correct brain MRI scan.")
+                        st.stop()
+                        status.update(label="✅ Analysis Complete", state="complete", expanded=False)
                
             
 
