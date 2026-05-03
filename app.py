@@ -287,10 +287,10 @@ elif st.session_state.view == 'portal':
                     st.write("Classifying pathology...")
                     idx = np.argmax(preds[0])
                     confidence = np.max(preds[0]) * 100
-   if confidence < 75:
-    raise Exception(
-        "Invalid scan. Please upload a correct brain MRI scan with the appropriate format."
-    )
+                    if confidence < 75:
+                        raise Exception(
+                            "Invalid scan. Please upload a correct brain MRI scan with the appropriate format."
+                        )
                     status.update(label="✅ Analysis Complete", state="complete", expanded=False)
 
                 brain_placeholder = st.empty()
