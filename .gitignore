@@ -1,7 +1,7 @@
-# Ignore Larger Files-Datasets and models
+# Ignore Larger Files-Datasets 
 dataset/
-
-
+# ignore keras model file
+models/phase2.keras
 # ignore pyhton cache
 __pycache__/
 *.pyc
