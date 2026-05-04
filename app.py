@@ -70,6 +70,28 @@ def apply_style(theme):
             border: 1px solid {border_color} !important;
         }}
 
+        /* Upload container Fix */
+        [data-testid="stFileUploader"] section {{
+            background-color: {card_bg} !important;
+            border-radius: 12px !important;
+            border: 1px solid {border_color} !important;
+        }}
+
+        /* Upload button Fix and text*/
+        [data-testid="stFileUploader"] section * {{
+            color: {text_color} !important;
+        }}
+            [data-testid="stFileUploader"] button {{
+            background-color: #111827 !important;
+            color: white !important;
+            border-radius: 8px !important;
+            
+        }}
+        [data-testid="stFileUploader"] button * {{
+        color: white !important;
+    }}
+        
+
         /* white background on the form submit button */
         [data-testid="stForm"] button {{
             background: linear-gradient(90deg, #4A90E2 0%, #E83E8C 100%) !important;
@@ -85,24 +107,6 @@ def apply_style(theme):
             background-color: {card_bg}; padding: 25px; border-radius: 12px;
             border-left: 5px solid #4A90E2; margin-bottom: 25px; color: {text_color};
         }}
-        
-    /* Upload container Fix */
-    [data-testid="stFileUploader"] section {{
-        background-color: {card_bg} !important;
-        border-radius: 12px !important;
-        border: 1px solid {border_color} !important;
-    }}
-
-     /* Upload button Fix and text*/
-     [data-testid="stFileUploader"] section * {{
-        color: {text_color} !important;
-    }}
-        [data-testid="stFileUploader"] button {{
-         background-color: #111827 !important;
-         color: white !important;
-        border-radius: 8px !important;
-         
-      }}
 
         .hover-card {{
             background: {card_bg}; border-radius: 15px; padding: 30px;
