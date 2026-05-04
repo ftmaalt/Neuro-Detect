@@ -108,10 +108,10 @@ def apply_style(theme):
             border-left: 5px solid #4A90E2; margin-bottom: 25px; color: {text_color};
         }}
 
-        .hover-card {{
-            background: {card_bg}; border-radius: 15px; padding: 30px;
-            border: 2px solid {border_color}; text-align: center; margin-top: 20px;
-            color: {text_color};
+        .hover-card  {{
+            background: {card_bg}; border-radius: 15px; padding: 30px !important;
+            border: 2px solid {border_color}; text-align: center; margin-top: 20px !important;
+            color: {text_color} !important;
         }}
 
         .confidence-container {{
