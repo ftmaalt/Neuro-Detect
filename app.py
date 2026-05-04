@@ -19,41 +19,14 @@ if "disclaimer_accepted" not in st.session_state:
 # css
 
 def apply_style(theme):
-    if st.session_state.theme == "dark":
-        bg_color = "#0E1117"
-        text_color = "#FAFAFA"
-        card_bg = "#262730"
-        border_color = "#3A3A45"
-    else:
-        bg_color = "#FFFFFF"
-        text_color = "#111827"
-        card_bg = "#F3F4F6"
-        border_color = "#D1D5DB"
+    bg_color = "#0E1117" if theme == 'dark' else "#FFFFFF"
+    text_color = "#FFFFFF" if theme == 'dark' else "#000000"
+    card_bg = "#1B212C" if theme == 'dark' else "#F0F2F6"
+    border_color = "#2D3748" if theme == 'dark' else "#D1D5DB"
     
-        st.markdown(f"""
-    <style>
-
-    /* main bg theme */
-    html, body, [data-testid="stAppViewContainer"], .stApp {{
-        background-color: {bg_color} !important;
-        color: {text_color} !important;
-    }}
-
-    /* upload container */
-    [data-testid="stFileUploader"] section {{
-        background-color: {card_bg} !important;
-        border-radius: 12px !important;
-        border: 1px solid {border_color} !important;
-    }}
-
-    /* upload button */
-    [data-testid="stFileUploader"] button {{
-        background-color: #111827 !important;
-        color: white !important;
-        border-radius: 8px !important;
-    }}
-
-
+    
+    st.markdown(f"""
+        <style>
         .stApp {{ background-color: {bg_color}; color: {text_color}; }}
         st.html{{
     scroll-behavior: smooth;
@@ -96,6 +69,20 @@ def apply_style(theme):
             border-radius: 12px !important;
             border: 1px solid {border_color} !important;
         }}
+
+    /* Upload container Fix */
+    [data-testid="stFileUploader"] section {{
+        background-color: {card_bg} !important;
+        border-radius: 12px !important;
+        border: 1px solid {border_color} !important;
+    }}
+
+    /* Upload button Fix */
+    [data-testid="stFileUploader"] button {{
+        background-color: #111827 !important;
+        color: white !important;
+        border-radius: 8px !important;
+    }}
 
         /* white background on the form submit button */
         [data-testid="stForm"] button {{
