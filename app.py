@@ -14,18 +14,23 @@ st.set_page_config(page_title="NeuroDetect", page_icon="🧠", layout="centered"
 
 if 'theme' not in st.session_state:
     st.session_state.theme = 'dark'
-
+if "disclaimer_accepted" not in st.session_state:
+    st.session_state.disclaimer_accepted = False
 # css
+
 def apply_style(theme):
     bg_color = "#0E1117" if theme == 'dark' else "#FFFFFF"
     text_color = "#FFFFFF" if theme == 'dark' else "#000000"
     card_bg = "#1B212C" if theme == 'dark' else "#F0F2F6"
     border_color = "#2D3748" if theme == 'dark' else "#D1D5DB"
     
+    
     st.markdown(f"""
         <style>
         .stApp {{ background-color: {bg_color}; color: {text_color}; }}
-        
+        st.html{{
+    scroll-behavior: smooth;
+    }}
         /* Global Button */
         div.stButton > button {{
             background: linear-gradient(90deg, #4A90E2 0%, #E83E8C 100%) !important;
@@ -242,26 +247,30 @@ elif st.session_state.view == 'faq':
 
 # MRI ANALYSIS PORTAL page
 elif st.session_state.view == 'portal':
-    if os.path.exists("ai_head.png"):
-        img_data = get_base64_image("ai_head.png")
-        st.markdown(f'<div style="position: fixed; top: 15px; right: 15px; z-index: 1000;"><img src="data:image/png;base64,{img_data}" width="70"></div>', unsafe_allow_html=True)
 
-    with st.sidebar:
-        if st.button("← Back to Home"):
-            st.session_state.view = 'landing'
+    @st.dialog("Acknowledgment")
+    def ack_modal():
+        st.markdown("""
+        This website is part of a **University Senior Project** and is intended for
+        educational and research purposes only.
+
+        It is not intended for clinical use and should not be used as a substitute
+        for professional medical diagnosis, treatment, or radiological evaluation.
+
+        By proceeding, you acknowledge that the results are for informational purposes
+        only and should be reviewed by a qualified healthcare professional.
+        """)
+
+        if st.button("I acknowledge"):
+            st.session_state.disclaimer_accepted = True
             st.rerun()
 
-    st.markdown("<h2 style='text-align: center;'>MRI Analysis Portal</h2>", unsafe_allow_html=True)
-    
-    st.markdown("""
-        <div class="clinical-body">
-            <p style="margin: 0; font-size: 1.1rem; line-height: 1.6;">
-                <b>Diagnostic Submission:</b> Please upload a high-resolution MRI scan below to detect any tumor and tumor type. 
-                The neural engine will perform voxel-wise analysis to <b>detect anomalies</b> and categorize 
-                <b>tumor pathology</b> with high-precision confidence scoring.
-            </p>
-        </div>
-    """, unsafe_allow_html=True)
+    if not st.session_state.disclaimer_accepted:
+        ack_modal()
+        st.stop()
+
+    if os.path.exists("ai_head.png"):
+        img_data = get_base64_image("ai_head.png")
 
     uploaded_file = st.file_uploader("Upload MRI", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
 
@@ -273,7 +282,7 @@ elif st.session_state.view == 'portal':
               if model is None:
                 st.error(f"Model not found at: {MODEL_PATH}")
      
-        else:
+              else:
                 with st.status("🧬 Analyzing Neural Patterns...", expanded=True) as status:
                     st.write("Isolating region of interest...")
 
