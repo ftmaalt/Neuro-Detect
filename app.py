@@ -83,6 +83,10 @@ def apply_style(theme):
         color: white !important;
         border-radius: 8px !important;
     }}
+         /* Light mode upload text fix */
+    [data-testid="stFileUploader"] section * {
+        color: {text_color} !important;
+        }
 
         /* white background on the form submit button */
         [data-testid="stForm"] button {{
@@ -287,6 +291,7 @@ elif st.session_state.view == 'portal':
         img_data = get_base64_image("ai_head.png")
 
     uploaded_file = st.file_uploader("Upload MRI", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
+    
 
     if uploaded_file:
         image = Image.open(uploaded_file)
