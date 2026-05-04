@@ -1,6 +1,5 @@
 # Ignore Larger Files-Datasets and models
 dataset/
-models/
 
 *.h5
 # ignore pyhton cache
