@@ -1,7 +1,7 @@
 # Ignore Larger Files-Datasets and models
 dataset/
 
-*.h5
+
 # ignore pyhton cache
 __pycache__/
 *.pyc
