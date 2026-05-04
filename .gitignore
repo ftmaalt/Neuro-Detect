@@ -1,7 +1,7 @@
 # Ignore Larger Files-Datasets and models
 dataset/
 models/
-*.keras
+
 *.h5
 # ignore pyhton cache
 __pycache__/
