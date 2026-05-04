@@ -111,7 +111,7 @@ def apply_style(theme):
         .hover-card {{
             background: {card_bg}; border-radius: 15px; padding: 30px;
             border: 2px solid {border_color}; text-align: center; margin-top: 20px;
-            color: {text_color}!important;
+            color: {text_color};
         }}
 
         .confidence-container {{
