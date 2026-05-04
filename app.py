@@ -122,7 +122,7 @@ apply_style(st.session_state.theme)
 
 # load asset
 BASE_DIR = Path(__file__).resolve().parent
-MODEL_PATH = BASE_DIR / "models" / "phase2.keras"
+MODEL_PATH = BASE_DIR / "models" / "phase2.h5"
 CLASS_NAMES = ['Glioma Tumor', 'Meningioma Tumor', 'No Tumor', 'Pituitary Tumor']
 
 @st.cache_resource
