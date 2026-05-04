@@ -77,16 +77,17 @@ def apply_style(theme):
         border: 1px solid {border_color} !important;
     }}
 
-    /* Upload button Fix */
-    [data-testid="stFileUploader"] button {{
-        background-color: #111827 !important;
-        color: white !important;
-        border-radius: 8px !important;
-    }}
-         /* Light mode upload text fix */
-    [data-testid="stFileUploader"] section * {
+     /* Upload button Fix and text*/
+     [data-testid="stFileUploader"] section * {{
         color: {text_color} !important;
-        }
+    }}
+        [data-testid="stFileUploader"] button {{
+         background-color: #111827 !important;
+         color: white !important;
+         border-radius: 8px !important;
+         
+     }}
+    
 
         /* white background on the form submit button */
         [data-testid="stForm"] button {{
