@@ -81,12 +81,12 @@ def apply_style(theme):
      [data-testid="stFileUploader"] section * {{
         color: {text_color} !important;
     }}
-        [data-testid="stFileUploader"] button {{
-         background-color: #111827 !important;
-         color: white !important;
-         border-radius: 8px !important;
+    #     [data-testid="stFileUploader"] button {{
+    #      background-color: #111827 !important;
+    #      color: white !important;
+    #      border-radius: 8px !important;
          
-     }}
+    #  }}
     
 
         /* white background on the form submit button */
