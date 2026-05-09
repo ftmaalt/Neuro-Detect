@@ -1,7 +1,7 @@
 import sys
 
 import streamlit as st
-import tensorflow as tf
+import keras
 from PIL import Image
 from pathlib import Path
 import numpy as np
@@ -16,6 +16,8 @@ if 'theme' not in st.session_state:
     st.session_state.theme = 'dark'
 if "disclaimer_accepted" not in st.session_state:
     st.session_state.disclaimer_accepted = False
+
+
 # css
 
 def apply_style(theme):
@@ -142,6 +144,51 @@ def apply_style(theme):
 
 apply_style(st.session_state.theme)
 
+# Replace the entire @st.dialog block with this
+if not st.session_state.disclaimer_accepted:
+    apply_style(st.session_state.theme)  # ensure styles load first
+    
+    st.markdown("<h1 class='main-title'>NEURO DETECT</h1>", unsafe_allow_html=True)
+    st.markdown("<p class='sub-title'>INTELLIGENCE AMPLIFIED</p>", unsafe_allow_html=True)
+    
+    st.markdown(f"""
+        <div style="
+            background-color: #1B212C;
+            border: 1px solid #2D3748;
+            border-left: 5px solid #4A90E2;
+            border-radius: 12px;
+            padding: 35px 40px;
+            max-width: 620px;
+            margin: 40px auto;
+            color: #FFFFFF;
+        ">
+            <div style="font-size: 1.5rem; font-weight: 700; color: #4A90E2; margin-top: 0; margin-bottom: 20px;">⚠️ Acknowledgment</div>
+            <p style="font-size: 1.2rem;">This website is part of a <strong>University Senior Project</strong> and is 
+            intended for educational and research purposes only.</p>
+            <p style="font-size: 1.2rem;">It is not intended for clinical use and should not be used as a substitute 
+            for professional medical diagnosis, treatment, or radiological evaluation.</p>
+            <p style="font-size:1.2rem ; margin-bottom: 0; ">By proceeding, you acknowledge that the results are 
+            for informational purposes only and should be reviewed by a qualified healthcare 
+            professional.</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        st.markdown("""
+            <style>
+                div.stButton > button {{
+                height: 65px !important;
+                font-size: 1.4rem !important;
+
+                }}
+                </style>
+            """, unsafe_allow_html=True)
+        if st.button("I Understand", use_container_width=True):
+            st.session_state.disclaimer_accepted = True
+            st.rerun()
+    st.stop()
+
 # load asset
 BASE_DIR = Path(__file__).resolve().parent
 MODEL_PATH = BASE_DIR / "models" / "phase2_clean.keras"
@@ -150,7 +197,7 @@ CLASS_NAMES = ['Glioma Tumor', 'Meningioma Tumor', 'No Tumor', 'Pituitary Tumor'
 @st.cache_resource
 def load_neuro_model():
     if MODEL_PATH.exists():
-        return tf.keras.models.load_model(str(MODEL_PATH), compile=False)
+        return keras.models.load_model(str(MODEL_PATH), compile=False)
     return None
 
 model = load_neuro_model()
@@ -269,28 +316,6 @@ elif st.session_state.view == 'faq':
 
 # MRI ANALYSIS PORTAL page
 elif st.session_state.view == 'portal':
-
-    @st.dialog("Acknowledgment")
-    def ack_modal():
-        st.markdown("""
-        This website is part of a **University Senior Project** and is intended for
-        educational and research purposes only.
-
-        It is not intended for clinical use and should not be used as a substitute
-        for professional medical diagnosis, treatment, or radiological evaluation.
-
-        By proceeding, you acknowledge that the results are for informational purposes
-        only and should be reviewed by a qualified healthcare professional.
-        """)
-
-        if st.button("I acknowledge"):
-            st.session_state.disclaimer_accepted = True
-            st.rerun()
-
-    if not st.session_state.disclaimer_accepted:
-        ack_modal()
-        st.stop()
-
     if os.path.exists("ai_head.png"):
         img_data = get_base64_image("ai_head.png")
 
@@ -345,7 +370,35 @@ elif st.session_state.view == 'portal':
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
-                
+                st.markdown("<br>**Probability Combarision:**")
+                cols = st.columns(4)
+                for i, (class_name, prob) in enumerate(zip(CLASS_NAMES, preds[0])):
+                    pct = float(prob) * 100
+                    is_top = i == idx
+                    border_color = "#4A90E2" if is_top else "#2D3748"
+                    text_color = "#4A90E2" if is_top else "#8B949E"
+                    bg_color = "#1A2535" if is_top else "#1B212C"
+
+                    with cols[i]:
+                        st.markdown(f"""
+                            <div style="
+                                background: {bg_color};
+                                border: 2px solid {border_color};
+                                border-radius: 10px;
+                                padding: 20px 10px;
+                                text-align: center;
+                            ">
+                                <div style="font-size: 0.8rem; color: {text_color}; 
+                                margin-bottom: 8px; font-weight: {'600' if is_top else '400'};">
+                                    {class_name}
+                                </div>
+                                <div style="font-size: 1.4rem; font-weight: bold; color: {text_color};">
+                                    {pct:.1f}%
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
+
+                # Toast and cleanup OUTSIDE the loop
                 if CLASS_NAMES[idx] == "No Tumor":
                     st.toast("✅ Analysis complete: No abnormalities detected.", icon="🧠")
                 else:
@@ -354,4 +407,4 @@ elif st.session_state.view == 'portal':
                 time.sleep(2.5)
                 brain_placeholder.empty()
 
-st.markdown("<br><hr><center><p style='color: #666;'>Senior Project 2026 | NeuroDetect AI</p></center>", unsafe_allow_html=True)
+st.markdown("<br><hr><center><p style='color: #666;'>Senior Project 2026 | NeuroDetect AI | Educational Purposes Only</p></center>", unsafe_allow_html=True)

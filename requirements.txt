@@ -1,6 +1,7 @@
-streamlit
-tensorflow==2.20.0
-keras==3.13.2
-pillow
+tensorflow-cpu==2.15.0
+opencv-python-headless
 numpy
-h5py
+matplotlib
+scikit-learn
+pillow
+streamlit
