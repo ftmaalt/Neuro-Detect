@@ -117,8 +117,9 @@ def apply_style(theme):
         }}
 
         .confidence-container {{
-            background-color: #0E1117; border-radius: 10px; height: 26px;
-            width: 100%; margin-top: 15px; border: 1px solid {border_color}; overflow: hidden;
+            background-color: {card_bg};  # was #0E1117 — now uses theme variable
+    border-radius: 10px; height: 26px;
+    width: 100%; margin-top: 15px; border: 1px solid {border_color}; overflow: hidden;
         }}
         .confidence-fill {{
             height: 100%; background: linear-gradient(90deg, #4A90E2 0%, #63B3ED 100%);
@@ -287,9 +288,8 @@ elif st.session_state.view == 'docs':
     if os.path.exists("README.md"):
         with open("README.md", "r", encoding="utf-8") as f:
             readme_text = f.read()
-            # Adding \n\n ensures the Markdown headings (#) work correctly inside the div
-            st.markdown(f'<div class="doc-container">\n\n{readme_text}\n\n</div>', unsafe_allow_html=True)
-
+        with st.container():
+            st.markdown(readme_text)
 # FAQ page with questions and answers 
 
 elif st.session_state.view == 'faq':
@@ -316,6 +316,23 @@ elif st.session_state.view == 'faq':
 
 # MRI ANALYSIS PORTAL page
 elif st.session_state.view == 'portal':
+    if model is None:
+        st.markdown(f"""
+            <div style="
+                background-color: #2D0000;
+                border-left: 4px solid #E53E3E;
+                border-radius: 6px;
+                padding: 16px 20px;
+                margin-bottom: 20px;
+                color: #FC8181;
+                font-size: 0.95rem;
+            ">
+                ⚠️ <strong>Diagnostic system offline.</strong> The AI model could not be loaded. 
+                Please contact support at <a href="mailto:info@neurodetectai.com" 
+                style="color: #FC8181;">info@neurodetectai.com</a>
+            </div>
+        """, unsafe_allow_html=True)
+        st.stop()  # blocks the rest of the portal from rendering
     if os.path.exists("ai_head.png"):
         img_data = get_base64_image("ai_head.png")
 
