@@ -263,7 +263,7 @@ elif st.session_state.view == 'contact':
     
     
     with st.form("contact_form", clear_on_submit=True):
-        st.write("Send a message to **spneurodetect@gmail.com**")
+        st.write("Send a message to **info@neurodetectai.com**")
         user_email = st.text_input("Your Email Address")
         user_msg = st.text_area("Message", height=150)
         
