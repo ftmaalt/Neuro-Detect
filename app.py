@@ -71,7 +71,6 @@ def apply_style(theme):
             border-radius: 12px !important;
             border: 1px solid {border_color} !important;
         }}
-
         /* Upload container Fix */
         [data-testid="stFileUploader"] section {{
             background-color: {card_bg} !important;
@@ -79,20 +78,33 @@ def apply_style(theme):
             border: 1px solid {border_color} !important;
         }}
 
-        /* Upload button Fix and text*/
         [data-testid="stFileUploader"] section * {{
             color: {text_color} !important;
         }}
-            [data-testid="stFileUploader"] button {{
-            background-color: #111827 !important;
-            color: white !important;
+
+        /* Upload button should follow theme */
+        [data-testid="stFileUploader"] button {{
+            background: {card_bg} !important;
+            color: {text_color} !important;
+            border: 1px solid {border_color} !important;
             border-radius: 8px !important;
-            
         }}
+
         [data-testid="stFileUploader"] button * {{
-        color: white !important;
-    }}
-        
+            color: {text_color} !important;
+        }}
+
+        /* Uploaded file name box */
+        [data-testid="stFileUploaderFile"] {{
+            background-color: {card_bg} !important;
+            color: {text_color} !important;
+            border: 1px solid {border_color} !important;
+            border-radius: 8px !important;
+        }}
+
+        [data-testid="stFileUploaderFile"] * {{
+            color: {text_color} !important;
+        }}
 
         /* white background on the form submit button */
         [data-testid="stForm"] button {{
@@ -154,14 +166,14 @@ if not st.session_state.disclaimer_accepted:
     
     st.markdown(f"""
         <div style="
-            background-color: #1B212C;
-            border: 1px solid #2D3748;
+            background-color: {{card_bg}};
+            border: 1px solid {{border_color}};
             border-left: 5px solid #4A90E2;
             border-radius: 12px;
             padding: 35px 40px;
             max-width: 620px;
             margin: 40px auto;
-            color: #FFFFFF;
+            color: {{text_color}};
         ">
             <div style="font-size: 1.5rem; font-weight: 700; color: #4A90E2; margin-top: 0; margin-bottom: 20px;">⚠️ Acknowledgment</div>
             <p style="font-size: 1.2rem;">This website is part of a <strong>University Senior Project</strong> and is 
@@ -387,15 +399,15 @@ elif st.session_state.view == 'portal':
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
-                st.markdown("<br>**Probability Combarision:**")
+                st.markdown("\n **Probability Combarision:**")
+                is_dark=st.session_state.theme=='dark'
                 cols = st.columns(4)
                 for i, (class_name, prob) in enumerate(zip(CLASS_NAMES, preds[0])):
                     pct = float(prob) * 100
                     is_top = i == idx
-                    border_color = "#4A90E2" if is_top else "#2D3748"
-                    text_color = "#4A90E2" if is_top else "#8B949E"
-                    bg_color = "#1A2535" if is_top else "#1B212C"
-
+                    border_color = "#4A90E2" if is_top else ("#2D3748" if is_dark else "#D1D5DB")
+                    text_color = "#4A90E2" if is_top else ("#8B949E" if is_dark else "#4A4A4A")
+                    bg_color = ("#1A2535" if is_dark else "#E8F0FB") if is_top else ("#1B212C" if is_dark else "#F0F2F6")
                     with cols[i]:
                         st.markdown(f"""
                             <div style="
