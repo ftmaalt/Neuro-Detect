@@ -60,6 +60,6 @@ The model was trained using publicly available Kaggle MRI datasets:
 
 **Developed By**
 - Yusra Husain Haji
-- Fatima Mohamed Hasan
-  
-<p align="center"><small>ITSE498 2026 </small></p>
+- Fatima Mohamed Hasan <br>
+<p align="center"><sub>ITSE498</sub></p>
+
