@@ -1,8 +1,8 @@
-"since moved to notebooks incase fails running-might remove it"
+
 import sys
 sys.path.append(".")
 
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from keras.preprocessing.image import ImageDataGenerator
 
 
 def create_data_generators(train_dir, test_dir, img_size, batch_size):
