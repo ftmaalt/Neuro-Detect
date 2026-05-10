@@ -560,7 +560,18 @@ def render_navbar() -> None:
             color: #4A90E2 !important;
             opacity: 1 !important;
         }}
-        .st-key-nav_home button,
+        .st-key-nav_landing button {{
+            color: {"#FFFFFF" if st.session_state.theme == "dark" else "#111111"} !important;
+            font-size: 1.08rem !important;
+            font-weight: 800 !important;
+            justify-content: flex-start !important;
+            padding-left: 0 !important;
+        }}
+        .st-key-nav_landing button:hover {{
+            background: transparent !important;
+            color: #4A90E2 !important;
+        }}
+        .st-key-nav_landing button,
         .st-key-nav_docs button,
         .st-key-nav_faq button {{
             background: transparent !important;
@@ -600,31 +611,28 @@ def render_navbar() -> None:
     )
 
     with st.container(key="nd_navbar"):
-        col1, col2, col3, col4, col5, col6 = st.columns(
-            [1.8, 0.8, 0.8, 0.8, 1.0, 0.5],
+        col1, col2, col3, col4, col5 = st.columns(
+            [2.2, 0.8, 0.8, 1.0, 0.5],
             vertical_alignment="center",
         )
 
         with col1:
-            st.markdown('<div class="nd-nav-brand-text">🧠 NeuroDetect</div>', unsafe_allow_html=True)
-
-        with col2:
-            if st.button("Home", key="nav_landing", use_container_width=True):
+            if st.button("🧠 NeuroDetect", key="nav_landing", use_container_width=True):
                 navigate("landing")
 
-        with col3:
+        with col2:
             if st.button("Docs", key="nav_docs", use_container_width=True):
                 navigate("docs")
 
-        with col4:
+        with col3:
             if st.button("FAQ", key="nav_faq", use_container_width=True):
                 navigate("faq")
 
-        with col5:
+        with col4:
             if st.button("Portal", key="nav_portal", use_container_width=True):
                 navigate("portal")
 
-        with col6:
+        with col5:
             if st.button(theme_label, key="nav_theme", help="Toggle theme", use_container_width=True):
                 set_theme(next_theme)
 
