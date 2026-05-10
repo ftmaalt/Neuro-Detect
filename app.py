@@ -1,237 +1,317 @@
-import sys
-
-import streamlit as st
-import keras
-from PIL import Image
 from pathlib import Path
-import numpy as np
-import os
-import base64
+import html
 import time
 
-# configuring page and initializing theme
+import keras
+import numpy as np
+import streamlit as st
+from PIL import Image, UnidentifiedImageError
+
+
 st.set_page_config(page_title="NeuroDetect", page_icon="🧠", layout="centered")
 
-if 'theme' not in st.session_state:
-    st.session_state.theme = 'dark'
-if "disclaimer_accepted" not in st.session_state:
-    st.session_state.disclaimer_accepted = False
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_PATH = BASE_DIR / "models" / "phase2_clean.keras"
+README_PATH = BASE_DIR / "README.md"
+LOGO_PATH = BASE_DIR / "logo.png"
+
+CLASS_NAMES = (
+    "Glioma Tumor",
+    "Meningioma Tumor",
+    "No Tumor",
+    "Pituitary Tumor",
+)
+VALID_VIEWS = {"landing", "docs", "faq", "portal"}
+VALID_THEMES = {"light", "dark"}
+IMAGE_SIZE = (256, 256)
+MIN_CONFIDENCE = 80.0
 
 
-# css
-def apply_style(theme):
-    bg_color = "#0E1117" if theme == 'dark' else "#FFFFFF"
-    text_color = "#FFFFFF" if theme == 'dark' else "#000000"
-    card_bg = "#1B212C" if theme == 'dark' else "#F0F2F6"
-    border_color = "#2D3748" if theme == 'dark' else "#D1D5DB"
+def init_state() -> None:
+    defaults = {
+        "theme": "dark",
+        "disclaimer_accepted": False,
+        "view": "landing",
+    }
+    for key, value in defaults.items():
+        st.session_state.setdefault(key, value)
 
-    st.markdown(f"""
+
+def sync_state_from_query_params() -> None:
+    view = st.query_params.get("view")
+    theme = st.query_params.get("theme")
+
+    if view in VALID_VIEWS:
+        st.session_state.view = view
+    if theme in VALID_THEMES:
+        st.session_state.theme = theme
+
+
+def navigate(view: str) -> None:
+    st.session_state.view = view
+    st.rerun()
+
+
+def set_theme(theme: str) -> None:
+    st.session_state.theme = theme
+    st.rerun()
+
+
+def apply_style(theme: str) -> None:
+    is_dark = theme == "dark"
+    bg_color = "#0E1117" if is_dark else "#FFFFFF"
+    text_color = "#FFFFFF" if is_dark else "#111111"
+    text_muted = "#8B949E" if is_dark else "#5A6478"
+    card_bg = "#1B212C" if is_dark else "#F0F2F6"
+    border_color = "#2D3748" if is_dark else "#D1D5DB"
+    step_num_bg = "#1A2535" if is_dark else "#E8F0FB"
+
+    st.markdown(
+        f"""
         <style>
         .stApp {{ background-color: {bg_color}; color: {text_color}; }}
+        .block-container {{ padding-top: 88px !important; max-width: 760px; }}
+        header[data-testid="stHeader"] {{
+            background: transparent !important;
+            height: 0 !important;
+            min-height: 0 !important;
+            overflow: visible !important;
+        }}
+        #stDecoration {{ display: none !important; }}
 
-        /* ── FIXED FLOATING NAV ── */
-        .floating-nav {{
+        .nd-nav {{
             position: fixed;
             top: 14px;
             left: 50%;
             transform: translateX(-50%);
-            z-index: 9999;
-            width: min(760px, calc(100vw - 40px));
+            z-index: 99999;
+            width: min(760px, calc(100vw - 32px));
             background-color: {card_bg};
             border: 1px solid {border_color};
             border-radius: 14px;
-            padding: 8px 16px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.28);
-            backdrop-filter: blur(12px);
+            padding: 8px 18px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+            backdrop-filter: blur(14px);
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 6px;
+            gap: 12px;
         }}
-
-        .nav-brand {{
+        .nd-nav-brand {{
             font-weight: 800;
-            color: {text_color};
             font-size: 1rem;
+            color: {text_color};
             white-space: nowrap;
-            flex-shrink: 0;
+            text-decoration: none !important;
         }}
-
-        .nav-links {{
+        .nd-nav-links,
+        .nd-nav-right {{
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 6px;
         }}
-
-        .nav-btn {{
-            background: transparent;
-            color: {text_color};
-            border: none;
-            font-weight: 600;
+        .nd-nav-links a,
+        .nd-nav-portal {{
             font-size: 0.875rem;
-            border-radius: 8px;
+            font-weight: 700;
+            text-decoration: none !important;
             padding: 6px 12px;
-            cursor: pointer;
+            border-radius: 8px;
             white-space: nowrap;
-            transition: background 0.15s, color 0.15s;
-            text-decoration: none;
         }}
-
-        .nav-btn:hover {{
-            background: rgba(74, 144, 226, 0.18);
+        .nd-nav-links a {{
+            color: {text_muted};
+            transition: background 0.15s, color 0.15s;
+        }}
+        .nd-nav-links a:hover,
+        .nd-nav-links a.active {{
+            background: rgba(74,144,226,0.14);
             color: #4A90E2;
         }}
-
-        .nav-btn-primary {{
+        .nd-nav-portal {{
             background: linear-gradient(90deg, #4A90E2 0%, #E83E8C 100%);
             color: white !important;
-            font-weight: 700;
         }}
-
-        .nav-btn-primary:hover {{
-            opacity: 0.88;
-            background: linear-gradient(90deg, #4A90E2 0%, #E83E8C 100%);
-        }}
-
-        .nav-btn-icon {{
+        .nd-nav-portal:hover {{ opacity: 0.88; }}
+        .nd-nav-theme {{
             font-size: 1.1rem;
-            padding: 6px 8px;
+            text-decoration: none !important;
+            padding: 4px 8px;
+            border-radius: 8px;
+            border: 1px solid {border_color};
+            line-height: 1;
+        }}
+        .nd-nav-marker,
+        .nd-nav-active-marker,
+        .nd-nav-brand-marker,
+        .nd-nav-portal-marker,
+        .nd-nav-theme-marker {{
+            display: none;
+        }}
+        div[data-testid="stHorizontalBlock"]:has(.nd-nav-marker) {{
+            position: fixed;
+            top: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 99999;
+            width: min(760px, calc(100vw - 32px));
+            background-color: {card_bg};
+            border: 1px solid {border_color};
+            border-radius: 14px;
+            padding: 8px 18px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+            backdrop-filter: blur(14px);
+            align-items: center;
+            gap: 6px;
+        }}
+        div[data-testid="stHorizontalBlock"]:has(.nd-nav-marker) div[data-testid="column"] {{
+            padding: 0 !important;
+        }}
+        div[data-testid="stHorizontalBlock"]:has(.nd-nav-marker) div.stButton > button {{
+            min-height: 34px !important;
+            height: 34px !important;
+            padding: 6px 12px !important;
+            border-radius: 8px !important;
+            border: 1px solid transparent !important;
+            background: transparent !important;
+            color: {text_muted} !important;
+            font-size: 0.875rem !important;
+            font-weight: 700 !important;
+            white-space: nowrap !important;
+            transition: background 0.15s, color 0.15s, opacity 0.15s !important;
+        }}
+        div[data-testid="stHorizontalBlock"]:has(.nd-nav-marker) div.stButton > button:hover {{
+            background: rgba(74,144,226,0.14) !important;
+            color: #4A90E2 !important;
+            border-color: transparent !important;
+        }}
+        div[data-testid="column"]:has(.nd-nav-brand-marker) div.stButton > button {{
+            color: {text_color} !important;
+            font-size: 1rem !important;
+            font-weight: 800 !important;
+            justify-content: flex-start !important;
+            padding-left: 0 !important;
+        }}
+        div[data-testid="column"]:has(.nd-nav-active-marker) div.stButton > button {{
+            background: rgba(74,144,226,0.12) !important;
+            color: #4A90E2 !important;
+        }}
+        div[data-testid="column"]:has(.nd-nav-portal-marker) div.stButton > button {{
+            background: linear-gradient(90deg, #4A90E2 0%, #E83E8C 100%) !important;
+            color: white !important;
+        }}
+        div[data-testid="column"]:has(.nd-nav-portal-marker) div.stButton > button:hover {{
+            opacity: 0.88 !important;
+        }}
+        div[data-testid="column"]:has(.nd-nav-theme-marker) div.stButton > button {{
+            border: 1px solid {border_color} !important;
+            color: {text_color} !important;
+            font-size: 1.05rem !important;
+            padding: 4px 8px !important;
         }}
 
-        /* Push page content below the fixed nav */
-        .block-container {{
-            padding-top: 80px !important;
-        }}
-
-        /* Global Button */
         div.stButton > button {{
             background: linear-gradient(90deg, #4A90E2 0%, #E83E8C 100%) !important;
             color: white !important;
             border: none !important;
             font-weight: bold !important;
             border-radius: 8px !important;
-            transition: 0.3s !important;
+            transition: 0.25s !important;
+        }}
+        div.stButton > button:hover {{ opacity: 0.88 !important; }}
+        .cta-wrap div.stButton > button {{
+            width: 320px !important;
+            height: 56px !important;
+            font-size: 1.1rem !important;
+            letter-spacing: 0.03em !important;
         }}
 
-        /* Landing Page Center Button */
-        .main-btn-container {{
+        .nd-hero {{ text-align: center; padding: 48px 0 20px; }}
+        .nd-hero h1 {{
+            font-size: 3.4rem;
+            font-weight: 800;
+            color: {text_color};
+            margin: 0 0 10px;
+            line-height: 1.1;
+        }}
+        .nd-hero p {{
+            font-size: 1.1rem;
+            color: {text_muted};
+            letter-spacing: 0.18em;
+            margin: 0 0 32px;
+        }}
+        .nd-section-title {{
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: {text_color};
+            margin: 40px 0 16px;
+            text-align: center;
+        }}
+        .nd-about,
+        .nd-doc,
+        .nd-step,
+        .nd-result {{
+            background: {card_bg};
+            border: 1px solid {border_color};
+            color: {text_color};
+        }}
+        .nd-about {{
+            border-left: 4px solid #4A90E2;
+            border-radius: 14px;
+            padding: 28px 32px;
+            margin-bottom: 12px;
+        }}
+        .nd-about p,
+        .nd-doc p,
+        .nd-step-desc,
+        .nd-page-sub,
+        .nd-tip,
+        .nd-upload-hint {{
+            color: {text_muted};
+        }}
+        .nd-about p {{ font-size: 1rem; line-height: 1.75; margin: 0; }}
+        .nd-about-title {{
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: {text_color};
+            margin-bottom: 10px;
+        }}
+        .nd-steps {{
             display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 12px;
+        }}
+        .nd-step {{
+            border-radius: 12px;
+            padding: 18px 22px;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+        }}
+        .nd-step-num {{
+            min-width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: {step_num_bg};
+            border: 1px solid #4A90E2;
+            color: #4A90E2;
+            font-size: 0.95rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
             justify-content: center;
-            padding: 20px 0;
+            flex-shrink: 0;
         }}
-
-        .main-btn-container div.stButton > button {{
-            width: 350px !important;
-            height: 60px !important;
-            font-size: 1.2rem !important;
+        .nd-step-title {{
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: {text_color};
+            margin-bottom: 3px;
         }}
-
-        /* Style the form container to match doc-container */
-        [data-testid="stForm"] {{
-            background-color: {card_bg} !important;
-            padding: 30px !important;
-            border-radius: 12px !important;
-            border: 1px solid {border_color} !important;
-        }}
-
-        /* Upload container Fix */
-        [data-testid="stFileUploader"] section {{
-            background-color: {card_bg} !important;
-            border-radius: 12px !important;
-            border: 1px solid {border_color} !important;
-        }}
-
-        [data-testid="stFileUploader"] section * {{
-            color: {text_color} !important;
-        }}
-
-        [data-testid="stFileUploader"] button {{
-            background: {card_bg} !important;
-            color: {text_color} !important;
-            border: 1px solid {border_color} !important;
-            border-radius: 8px !important;
-        }}
-
-        [data-testid="stFileUploader"] button * {{
-            color: {text_color} !important;
-        }}
-
-        [data-testid="stFileUploaderFile"] {{
-            background-color: {card_bg} !important;
-            color: {text_color} !important;
-            border: 1px solid {border_color} !important;
-            border-radius: 8px !important;
-        }}
-
-        [data-testid="stFileUploaderFile"] * {{
-            color: {text_color} !important;
-        }}
-
-        [data-testid="stForm"] button {{
-            background: linear-gradient(90deg, #4A90E2 0%, #E83E8C 100%) !important;
-            color: white !important;
-            border: none !important;
-            width: 100% !important;
-            height: 45px !important;
-        }}
-
-        .main-title {{ text-align: center; font-size: 3.5rem; font-weight: 800; color: {text_color}; margin-top: 20px; }}
-        .sub-title {{ text-align: center; font-size: 1.2rem; color: #4A90E2; margin-bottom: 30px; letter-spacing: 2px; }}
-
-        .clinical-body {{
-            background-color: {card_bg}; padding: 25px; border-radius: 12px;
-            border-left: 5px solid #4A90E2; margin-bottom: 25px; color: {text_color};
-        }}
-
-        .hover-card {{
-            background: {card_bg}; border-radius: 15px; padding: 30px !important;
-            border: 2px solid {border_color}; text-align: center; margin-top: 20px !important;
-            color: {text_color} !important;
-        }}
-
-        .confidence-container {{
-            background-color: {card_bg};
-            border-radius: 10px; height: 26px;
-            width: 100%; margin-top: 15px; border: 1px solid {border_color}; overflow: hidden;
-        }}
-        .confidence-fill {{
-            height: 100%; background: linear-gradient(90deg, #4A90E2 0%, #63B3ED 100%);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 13px; font-weight: bold; color: white;
-        }}
-
-        @keyframes brainRotateFade {{
-            0% {{ transform: translate(-50%, -50%) rotate(0deg) scale(0.5); opacity: 0; }}
-            20% {{ transform: translate(-50%, -50%) rotate(72deg) scale(1.2); opacity: 1; }}
-            80% {{ transform: translate(-50%, -50%) rotate(288deg) scale(1.2); opacity: 1; }}
-            100% {{ transform: translate(-50%, -50%) rotate(360deg) scale(2); opacity: 0; }}
-        }}
-        .brain-overlay {{
-            position: fixed; top: 50%; left: 50%; z-index: 9999;
-            font-size: 200px; pointer-events: none;
-            animation: brainRotateFade 2.5s ease-in-out forwards;
-        }}
-
-        .doc-container {{ background-color: {card_bg}; padding: 40px; border-radius: 12px; border: 1px solid {border_color}; }}
-        </style>
-        """, unsafe_allow_html=True)
-
-
-apply_style(st.session_state.theme)
-
-# ── DISCLAIMER ──────────────────────────────────────────────────────────────
-if not st.session_state.disclaimer_accepted:
-    # BUG FIX: was using {{card_bg}} / {{text_color}} as literal strings — now real f-string vars
-    card_bg = "#1B212C" if st.session_state.theme == 'dark' else "#F0F2F6"
-    border_color = "#2D3748" if st.session_state.theme == 'dark' else "#D1D5DB"
-    text_color = "#FFFFFF" if st.session_state.theme == 'dark' else "#000000"
-
-    st.markdown("<h1 class='main-title'>NEURO DETECT</h1>", unsafe_allow_html=True)
-    st.markdown("<p class='sub-title'>INTELLIGENCE AMPLIFIED</p>", unsafe_allow_html=True)
-
-    st.markdown(f"""
-        <div style="
-            background-color: {card_bg};
+        .nd-step-desc {{ font-size: 0.875rem; line-height: 1.5; }}
+        .nd-disclaimer {{
+            background: {card_bg};
             border: 1px solid {border_color};
             border-left: 5px solid #4A90E2;
             border-radius: 12px;
@@ -239,290 +319,639 @@ if not st.session_state.disclaimer_accepted:
             max-width: 620px;
             margin: 40px auto;
             color: {text_color};
-        ">
-            <div style="font-size: 1.5rem; font-weight: 700; color: #4A90E2; margin-top: 0; margin-bottom: 20px;">⚠️ Acknowledgment</div>
-            <p style="font-size: 1.2rem;">This website is part of a <strong>University Senior Project</strong> and is
-            intended for educational and research purposes only.</p>
-            <p style="font-size: 1.2rem;">It is not intended for clinical use and should not be used as a substitute
-            for professional medical diagnosis, treatment, or radiological evaluation.</p>
-            <p style="font-size:1.2rem; margin-bottom: 0;">By proceeding, you acknowledge that the results are
-            for informational purposes only and should be reviewed by a qualified healthcare
-            professional.</p>
-        </div>
-    """, unsafe_allow_html=True)
+        }}
+        .nd-disclaimer-title {{
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #4A90E2;
+            margin-bottom: 18px;
+        }}
+        .nd-disclaimer p {{
+            font-size: 1.05rem;
+            color: {text_muted};
+            line-height: 1.7;
+            margin-bottom: 12px;
+        }}
+        .nd-upload-hint {{
+            background: {card_bg};
+            border: 1px dashed {border_color};
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+        }}
+        [data-testid="stFileUploader"] section,
+        [data-testid="stFileUploaderFile"] {{
+            background-color: {card_bg} !important;
+            border-radius: 12px !important;
+            border: 1px solid {border_color} !important;
+        }}
+        [data-testid="stFileUploader"] section *,
+        [data-testid="stFileUploaderFile"] * {{ color: {text_color} !important; }}
+        [data-testid="stFileUploader"] button,
+        [data-testid="baseButton-secondary"] {{
+            background: {card_bg} !important;
+            color: {text_color} !important;
+            border: 1px solid {border_color} !important;
+            border-radius: 8px !important;
+        }}
+        [data-testid="stStatusWidget"],
+        [data-testid="stExpander"],
+        div[data-testid="stExpander"] > details,
+        div[data-testid="stExpander"] > details > summary {{
+            background-color: {card_bg} !important;
+            color: {text_color} !important;
+            border: 1px solid {border_color} !important;
+            border-radius: 10px !important;
+        }}
+        [data-testid="stStatusWidget"] *,
+        [data-testid="stExpander"] * {{ color: {text_color} !important; }}
+        .nd-result {{
+            border-width: 2px;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            margin-top: 20px;
+        }}
+        .nd-result-label {{
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #4A90E2;
+            letter-spacing: 0.1em;
+            margin-bottom: 6px;
+        }}
+        .nd-result-name {{
+            font-size: 2.4rem;
+            font-weight: 800;
+            color: {text_color};
+            margin: 0 0 18px;
+        }}
+        .nd-result-divider {{
+            border: 0;
+            border-top: 1px solid {border_color};
+            margin: 18px 0;
+        }}
+        .nd-conf-label {{ font-size: 0.9rem; color: {text_muted}; margin-bottom: 6px; }}
+        .nd-conf-bar {{
+            background: {border_color};
+            border-radius: 10px;
+            height: 26px;
+            overflow: hidden;
+        }}
+        .nd-conf-fill {{
+            height: 100%;
+            background: linear-gradient(90deg, #4A90E2 0%, #63B3ED 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: bold;
+            color: white;
+            border-radius: 10px;
+        }}
+        .nd-tip {{
+            background: {card_bg};
+            border-left: 3px solid #4A90E2;
+            border-radius: 6px;
+            padding: 12px 16px;
+            font-size: 0.85rem;
+            margin-top: 16px;
+        }}
+        .nd-doc {{
+            border-radius: 12px;
+            padding: 36px 40px;
+        }}
+        .nd-doc h4 {{
+            color: {text_color};
+            font-size: 1rem;
+            font-weight: 700;
+            margin: 0 0 6px;
+        }}
+        .nd-doc p {{
+            font-size: 0.925rem;
+            line-height: 1.7;
+            margin-bottom: 22px;
+        }}
+        @keyframes brainRotateFade {{
+            0% {{ transform: translate(-50%,-50%) rotate(0deg) scale(0.5); opacity: 0; }}
+            20% {{ transform: translate(-50%,-50%) rotate(72deg) scale(1.2); opacity: 1; }}
+            80% {{ transform: translate(-50%,-50%) rotate(288deg) scale(1.2); opacity: 1; }}
+            100% {{ transform: translate(-50%,-50%) rotate(360deg) scale(2); opacity: 0; }}
+        }}
+        .brain-overlay {{
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            z-index: 9999;
+            font-size: 200px;
+            pointer-events: none;
+            animation: brainRotateFade 2.5s ease-in-out forwards;
+        }}
+        .nd-page-title {{
+            font-size: 1.9rem;
+            font-weight: 800;
+            color: {text_color};
+            margin-bottom: 6px;
+        }}
+        .nd-page-sub {{
+            font-size: 0.95rem;
+            margin-bottom: 28px;
+        }}
+        @media (max-width: 640px) {{
+            .block-container {{ padding-top: 120px !important; }}
+            .nd-nav,
+            div[data-testid="stHorizontalBlock"]:has(.nd-nav-marker) {{
+                align-items: flex-start;
+                flex-wrap: wrap;
+                padding: 10px 12px;
+            }}
+            .nd-nav-links {{
+                order: 3;
+                width: 100%;
+                justify-content: space-between;
+            }}
+            .nd-hero h1 {{ font-size: 2.4rem; }}
+            .nd-result-name {{ font-size: 1.8rem; }}
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col2:
+
+@st.cache_resource(show_spinner=False)
+def load_neuro_model():
+    if not MODEL_PATH.exists():
+        return None
+    try:
+        return keras.models.load_model(str(MODEL_PATH), compile=False)
+    except Exception as exc:
+        st.session_state.model_load_error = str(exc)
+        return None
+
+
+def preprocess_image(image: Image.Image) -> np.ndarray:
+    img = image.convert("RGB").resize(IMAGE_SIZE)
+    arr = np.asarray(img, dtype=np.float32)
+    return np.expand_dims(arr, axis=0)
+
+
+def normalize_predictions(predictions: np.ndarray) -> np.ndarray:
+    scores = np.asarray(predictions, dtype=np.float32).reshape(-1)
+    if scores.size != len(CLASS_NAMES):
+        raise ValueError(
+            f"Expected {len(CLASS_NAMES)} model outputs, got {scores.size}."
+        )
+    if np.any(scores < 0) or not np.isclose(float(scores.sum()), 1.0, atol=1e-3):
+        exp_scores = np.exp(scores - np.max(scores))
+        scores = exp_scores / exp_scores.sum()
+    return scores
+
+
+def render_navbar() -> None:
+    active = st.session_state.view
+    next_theme = "light" if st.session_state.theme == "dark" else "dark"
+    theme_label = "☀️" if st.session_state.theme == "dark" else "🌙"
+
+    st.markdown(
+        f"""
+        <style>
+        .st-key-nd_navbar {{
+            position: fixed;
+            top: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 99999;
+            width: min(760px, calc(100vw - 32px));
+            background: transparent !important;
+            border: none !important;
+            border-radius: 14px;
+            padding: 0 !important;
+            box-shadow: none !important;
+            backdrop-filter: none !important;
+        }}
+        .st-key-nd_navbar div[data-testid="column"] {{
+            padding: 0 3px !important;
+        }}
+        .nd-nav-brand-text {{
+            color: {"#FFFFFF" if st.session_state.theme == "dark" else "#111111"};
+            font-size: 1.08rem;
+            font-weight: 800;
+            line-height: 34px;
+            white-space: nowrap;
+        }}
+        .st-key-nd_navbar button {{
+            min-height: 34px !important;
+            height: 34px !important;
+            background: transparent !important;
+            color: {"#8B949E" if st.session_state.theme == "dark" else "#5A6478"} !important;
+            border: none !important;
+            border-radius: 8px !important;
+            font-size: 0.875rem !important;
+            font-weight: 700 !important;
+            padding: 6px 12px !important;
+            box-shadow: none !important;
+            white-space: nowrap !important;
+        }}
+        .st-key-nd_navbar button:hover {{
+            background: rgba(74,144,226,0.14) !important;
+            color: #4A90E2 !important;
+            opacity: 1 !important;
+        }}
+        .st-key-nav_home button,
+        .st-key-nav_docs button,
+        .st-key-nav_faq button {{
+            background: transparent !important;
+        }}
+        .st-key-nav_{active} button {{
+            background: rgba(74,144,226,0.12) !important;
+            color: #4A90E2 !important;
+        }}
+        .st-key-nav_portal button {{
+            background: linear-gradient(90deg, #4A90E2 0%, #E83E8C 100%) !important;
+            color: white !important;
+        }}
+        .st-key-nav_portal button:hover {{
+            opacity: 0.88 !important;
+            color: white !important;
+        }}
+        .st-key-nav_theme button {{
+            border: 1px solid {"#2D3748" if st.session_state.theme == "dark" else "#D1D5DB"} !important;
+            color: {"#FFFFFF" if st.session_state.theme == "dark" else "#111111"} !important;
+            padding: 4px 8px !important;
+        }}
+        @media (max-width: 640px) {{
+            .st-key-nd_navbar {{
+                width: calc(100vw - 24px);
+            }}
+            .nd-nav-brand-text {{
+                font-size: 0.95rem;
+            }}
+            .st-key-nd_navbar button {{
+                font-size: 0.78rem !important;
+                padding: 5px 7px !important;
+            }}
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    with st.container(key="nd_navbar"):
+        col1, col2, col3, col4, col5, col6 = st.columns(
+            [1.8, 0.8, 0.8, 0.8, 1.0, 0.5],
+            vertical_alignment="center",
+        )
+
+        with col1:
+            st.markdown('<div class="nd-nav-brand-text">🧠 NeuroDetect</div>', unsafe_allow_html=True)
+
+        with col2:
+            if st.button("Home", key="nav_landing", use_container_width=True):
+                navigate("landing")
+
+        with col3:
+            if st.button("Docs", key="nav_docs", use_container_width=True):
+                navigate("docs")
+
+        with col4:
+            if st.button("FAQ", key="nav_faq", use_container_width=True):
+                navigate("faq")
+
+        with col5:
+            if st.button("Portal", key="nav_portal", use_container_width=True):
+                navigate("portal")
+
+        with col6:
+            if st.button(theme_label, key="nav_theme", help="Toggle theme", use_container_width=True):
+                set_theme(next_theme)
+
+
+def render_disclaimer() -> None:
+    st.markdown(
+        """
+        <h1 style="text-align:center;font-size:3rem;font-weight:800;margin-top:40px">NEURO DETECT</h1>
+        <p style="text-align:center;font-size:1.1rem;color:#4A90E2;letter-spacing:0.18em;margin-bottom:0">
+            INTELLIGENCE AMPLIFIED
+        </p>
+        <div class="nd-disclaimer">
+            <div class="nd-disclaimer-title">⚠️ Acknowledgment</div>
+            <p>This website is part of a <strong>University Senior Project</strong> and is
+            intended for educational and research purposes only.</p>
+            <p>It is not intended for clinical use and should not be used as a substitute
+            for professional medical diagnosis, treatment, or radiological evaluation.</p>
+            <p>By proceeding, you acknowledge that the results are for informational purposes
+            only and should be reviewed by a qualified healthcare professional.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    _, center, _ = st.columns([1, 1, 1])
+    with center:
         if st.button("I Understand", use_container_width=True):
             st.session_state.disclaimer_accepted = True
             st.rerun()
-    st.stop()
-
-# ── LOAD MODEL ───────────────────────────────────────────────────────────────
-BASE_DIR = Path(__file__).resolve().parent
-MODEL_PATH = BASE_DIR / "models" / "phase2_clean.keras"
-CLASS_NAMES = ['Glioma Tumor', 'Meningioma Tumor', 'No Tumor', 'Pituitary Tumor']
 
 
-@st.cache_resource
-def load_neuro_model():
-    if MODEL_PATH.exists():
-        return keras.models.load_model(str(MODEL_PATH), compile=False)
-    return None
-
-
-model = load_neuro_model()
-
-
-def get_base64_image(path):
-    with open(path, "rb") as f:
-        return base64.b64encode(f.read()).decode()
-
-
-if 'view' not in st.session_state:
-    st.session_state.view = 'landing'
-
-# ── FLOATING NAV (pure HTML — no broken div-wrapping of Streamlit widgets) ──
-theme_label = "☀️" if st.session_state.theme == 'dark' else "🌙"
-active = st.session_state.view
-
-def nav_class(page):
-    base = "nav-btn"
-    if page == "portal":
-        base += " nav-btn-primary"
-    return base
-
-st.markdown(f"""
-    <div class="floating-nav">
-        <span class="nav-brand">🧠 NeuroDetect</span>
-        <div class="nav-links">
-            <button class="nav-btn" onclick="window.parent.postMessage({{type:'streamlit:setComponentValue', value:'home'}}, '*')"
-                style="{'color:#4A90E2;text-decoration:underline;' if active=='landing' else ''}">Home</button>
-            <button class="nav-btn nav-btn-primary" onclick="window.parent.postMessage({{type:'streamlit:setComponentValue', value:'portal'}}, '*')">Portal</button>
-            <button class="nav-btn" onclick="window.parent.postMessage({{type:'streamlit:setComponentValue', value:'docs'}}, '*')"
-                style="{'color:#4A90E2;text-decoration:underline;' if active=='docs' else ''}">Docs</button>
-            <button class="nav-btn" onclick="window.parent.postMessage({{type:'streamlit:setComponentValue', value:'faq'}}, '*')"
-                style="{'color:#4A90E2;text-decoration:underline;' if active=='faq' else ''}">FAQ</button>
+def render_landing() -> None:
+    st.markdown(
+        """
+        <div class="nd-hero">
+            <h1>NEURO DETECT</h1>
+            <p>INTELLIGENCE AMPLIFIED</p>
         </div>
-        <span class="nav-btn nav-btn-icon" style="cursor:default">{theme_label}</span>
-    </div>
-""", unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True,
+    )
 
-# Actual nav buttons — hidden visually, drive the real navigation logic
-# These are real Streamlit buttons tucked in a zero-height container via CSS
-st.markdown("""<div style="height:0;overflow:hidden;position:absolute;pointer-events:none;">""", unsafe_allow_html=True)
-col_home, col_portal, col_docs, col_faq, col_theme = st.columns(5)
-with col_home:
-    if st.button("Home", key="nav_home"):
-        st.session_state.view = 'landing'
-        st.rerun()
-with col_portal:
-    if st.button("Portal", key="nav_portal"):
-        st.session_state.view = 'portal'
-        st.rerun()
-with col_docs:
-    if st.button("Docs", key="nav_docs"):
-        st.session_state.view = 'docs'
-        st.rerun()
-with col_faq:
-    if st.button("FAQ", key="nav_faq"):
-        st.session_state.view = 'faq'
-        st.rerun()
-with col_theme:
-    if st.button(theme_label, key="nav_theme"):
-        st.session_state.theme = 'light' if st.session_state.theme == 'dark' else 'dark'
-        st.rerun()
-st.markdown("""</div>""", unsafe_allow_html=True)
+    if LOGO_PATH.exists():
+        _, center, _ = st.columns([1, 2, 1])
+        with center:
+            st.image(str(LOGO_PATH), use_container_width=True)
 
-# ── PAGES ────────────────────────────────────────────────────────────────────
-
-# LANDING PAGE
-if st.session_state.view == 'landing':
-    st.markdown("<h1 class='main-title'>NEURO DETECT</h1>", unsafe_allow_html=True)
-    st.markdown("<p class='sub-title'>INTELLIGENCE AMPLIFIED</p>", unsafe_allow_html=True)
-
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        if os.path.exists("logo.png"):
-            st.image("logo.png", use_container_width=True)
-
-    st.write("##")
-
-    st.markdown('<div class="main-btn-container">', unsafe_allow_html=True)
+    st.markdown('<div class="cta-wrap">', unsafe_allow_html=True)
     if st.button("Enter Diagnostic Portal"):
-        st.session_state.view = 'portal'
-        st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+        navigate("portal")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-# CONTACT US PAGE
-elif st.session_state.view == 'contact':
-    if st.button("← Back to Home"):
-        st.session_state.view = 'landing'
-        st.rerun()
-
-    st.markdown("## 📧 Contact Support")
-
-    with st.form("contact_form", clear_on_submit=True):
-        st.write("Send a message to **info@neurodetectai.com**")
-        user_email = st.text_input("Your Email Address")
-        user_msg = st.text_area("Message", height=150)
-
-        submit_button = st.form_submit_button("Send Message")
-
-        if submit_button:
-            if user_email and user_msg:
-                st.success("Message received. We will contact you shortly!")
-                st.balloons()
-            else:
-                st.error("Please fill out both fields.")
-
-# PROJECT DOCUMENTATION PAGE
-elif st.session_state.view == 'docs':
-    if st.button("← Back to Home"):
-        st.session_state.view = 'landing'
-        st.rerun()
-    st.markdown("## 📄 Project Documentation")
-    if os.path.exists("README.md"):
-        with open("README.md", "r", encoding="utf-8") as f:
-            readme_text = f.read()
-        with st.container():
-            st.markdown(readme_text)
-
-# FAQ PAGE
-elif st.session_state.view == 'faq':
-    if st.button("← Back to Home"):
-        st.session_state.view = 'landing'
-        st.rerun()
-    st.markdown("## ❓ Frequently Asked Questions")
-
-    card_bg = "#1B212C" if st.session_state.theme == 'dark' else "#F0F2F6"
-    border_color = "#2D3748" if st.session_state.theme == 'dark' else "#D1D5DB"
-
-    st.markdown("""
-        <div class="doc-container">
-            <h4>What is NeuroDetect?</h4>
-            <p>NeuroDetect is a deep learning-based diagnostic support tool designed to identify and classify brain tumors
-            from MRI scans into four categories: Glioma, Meningioma, Pituitary, or No Tumor.</p>
-            <h4>What is the purpose of this tool?</h4>
-            <p>To assist in the classification of brain tumors using deep learning patterns from MRI scans.
-            This portal is designed for educational and research purposes to demonstrate the capabilities of
-            Computer Vision in healthcare. It is intended to assist, not replace, professional radiological evaluation.</p>
-            <h4>What model architecture is used?</h4>
-            <p>NeuroDetect is built on a Convolutional Neural Network (CNN) trained on thousands of labeled MRI slices
-            to recognize spatial patterns and textures indicative of different tumor pathologies.</p>
-            <h4>Is it 100% accurate?</h4>
-            <p>This is research-based and still in early stages of deployment. With more datasets and model training
-            we believe it will optimize to be highly accurate. All findings must be reviewed by a specialist.</p>
+    st.markdown('<div class="nd-section-title">About NeuroDetect</div>', unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="nd-about">
+            <div class="nd-about-title">What is NeuroDetect?</div>
+            <p>
+                NeuroDetect is a deep learning-powered diagnostic support tool developed as a
+                University Senior Project. It uses a Convolutional Neural Network trained on
+                labeled MRI slices to classify brain scans into four categories: Glioma,
+                Meningioma, Pituitary Tumor, or No Tumor.<br><br>
+                The system demonstrates the potential of computer vision in clinical decision
+                support. It does not replace radiological expertise, and all results must be
+                reviewed by a qualified healthcare professional.
+            </p>
         </div>
-    """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True,
+    )
 
-# MRI ANALYSIS PORTAL PAGE
-elif st.session_state.view == 'portal':
-    if model is None:
-        st.markdown(f"""
-            <div style="
-                background-color: #2D0000;
-                border-left: 4px solid #E53E3E;
-                border-radius: 6px;
-                padding: 16px 20px;
-                margin-bottom: 20px;
-                color: #FC8181;
-                font-size: 0.95rem;
-            ">
-                ⚠️ <strong>Diagnostic system offline.</strong> The AI model could not be loaded.
-                Please contact support at <a href="mailto:info@neurodetectai.com"
-                style="color: #FC8181;">info@neurodetectai.com</a>
+    st.markdown('<div class="nd-section-title">How It Works</div>', unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="nd-steps">
+            <div class="nd-step">
+                <div class="nd-step-num">1</div>
+                <div>
+                    <div class="nd-step-title">Upload a brain MRI scan</div>
+                    <div class="nd-step-desc">Use the Diagnostic Portal to upload a JPG or PNG MRI slice.</div>
+                </div>
             </div>
-        """, unsafe_allow_html=True)
+            <div class="nd-step">
+                <div class="nd-step-num">2</div>
+                <div>
+                    <div class="nd-step-title">AI analyzes the image</div>
+                    <div class="nd-step-desc">The scan is resized, normalized, and classified across all four categories.</div>
+                </div>
+            </div>
+            <div class="nd-step">
+                <div class="nd-step-num">3</div>
+                <div>
+                    <div class="nd-step-title">Review the results</div>
+                    <div class="nd-step-desc">You receive the primary prediction, confidence score, and probability breakdown.</div>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_docs() -> None:
+    st.markdown('<div class="nd-page-title">📄 Project Documentation</div>', unsafe_allow_html=True)
+    st.markdown('<div class="nd-page-sub">Technical details and project overview.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="nd-doc">', unsafe_allow_html=True)
+    st.markdown(README_PATH.read_text(encoding="utf-8"))
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def render_faq() -> None:
+    st.markdown('<div class="nd-page-title">❓ Frequently Asked Questions</div>', unsafe_allow_html=True)
+    st.markdown('<div class="nd-page-sub">Everything you need to know about NeuroDetect.</div>', unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="nd-doc">
+            <h4>What is NeuroDetect?</h4>
+            <p>NeuroDetect is a deep learning-based diagnostic support tool designed to classify
+            brain tumor MRI scans into Glioma, Meningioma, Pituitary Tumor, or No Tumor.</p>
+            <h4>What is the purpose of this tool?</h4>
+            <p>It demonstrates computer vision in healthcare for educational and research
+            purposes. It is intended to assist, not replace, professional radiological evaluation.</p>
+            <h4>What model architecture is used?</h4>
+            <p>NeuroDetect uses a Convolutional Neural Network trained to recognize spatial
+            patterns and textures in labeled MRI slices.</p>
+            <h4>Is it 100% accurate?</h4>
+            <p>No. This is a research project, and every finding must be reviewed by a specialist.</p>
+            <h4>Is my scan data stored?</h4>
+            <p>No. Uploaded scans are used only for temporary in-session processing.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_model_offline() -> None:
+    details = st.session_state.get("model_load_error")
+    detail_html = ""
+    if details:
+        detail_html = f"<br><small>{html.escape(details)}</small>"
+    st.markdown(
+        f"""
+        <div style="
+            background-color:#2D0000;border-left:4px solid #E53E3E;
+            border-radius:6px;padding:16px 20px;margin-bottom:20px;
+            color:#FC8181;font-size:0.95rem;">
+            ⚠️ <strong>Diagnostic system offline.</strong> The AI model could not be loaded.
+            Please confirm the model exists at <code>{html.escape(str(MODEL_PATH))}</code>.
+            {detail_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_probability_card(class_name: str, probability: float, is_top: bool) -> None:
+    is_dark = st.session_state.theme == "dark"
+    b_color = "#4A90E2" if is_top else ("#2D3748" if is_dark else "#D1D5DB")
+    t_color = "#4A90E2" if is_top else ("#8B949E" if is_dark else "#5A6478")
+    bg = ("#1A2535" if is_dark else "#E8F0FB") if is_top else ("#1B212C" if is_dark else "#F0F2F6")
+    fw = "700" if is_top else "400"
+    safe_name = html.escape(class_name)
+    pct = probability * 100
+
+    st.markdown(
+        f"""
+        <div style="background:{bg};border:2px solid {b_color};
+            border-radius:10px;padding:18px 8px;text-align:center;">
+            <div style="font-size:0.78rem;color:{t_color};font-weight:{fw};margin-bottom:6px;">
+                {safe_name}
+            </div>
+            <div style="font-size:1.35rem;font-weight:700;color:{t_color};">
+                {pct:.1f}%
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_portal() -> None:
+    st.markdown('<div class="nd-page-title">🧠 Diagnostic Portal</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="nd-page-sub">Upload a brain MRI scan to receive an AI-assisted classification.</div>',
+        unsafe_allow_html=True,
+    )
+
+    model = load_neuro_model()
+    if model is None:
+        render_model_offline()
+        return
+
+    uploaded_file = st.file_uploader(
+        "Upload MRI scan (JPG / JPEG / PNG)",
+        type=["jpg", "jpeg", "png"],
+        label_visibility="visible",
+    )
+
+    if not uploaded_file:
+        st.markdown(
+            """
+            <div class="nd-upload-hint">
+                Drop a JPG or PNG brain MRI scan above to begin analysis.<br>
+                <small>Scans are processed in-session only and never stored.</small>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
+    try:
+        image = Image.open(uploaded_file)
+        image.verify()
+        uploaded_file.seek(0)
+        image = Image.open(uploaded_file).convert("RGB")
+    except (UnidentifiedImageError, OSError):
+        st.error("The uploaded file could not be read as an image. Please upload a valid JPG or PNG scan.")
+        return
+
+    st.image(image, caption="Current patient scan", use_container_width=True)
+
+    if not st.button("🧠 INITIATE NEURAL DIAGNOSTIC"):
+        return
+
+    try:
+        with st.status("🧬 Analyzing neural patterns...", expanded=True) as status:
+            st.write("Preparing scan...")
+            img_array = preprocess_image(image)
+
+            time.sleep(0.3)
+            st.write("Extracting deep features...")
+            raw_predictions = model.predict(img_array, verbose=0)
+            scores = normalize_predictions(raw_predictions)
+
+            time.sleep(0.3)
+            st.write("Classifying pathology...")
+            idx = int(np.argmax(scores))
+            confidence = float(scores[idx]) * 100
+
+            if confidence < MIN_CONFIDENCE:
+                status.update(label="❌ Invalid scan", state="error", expanded=False)
+                st.error("Invalid scan. Please upload a correct brain MRI scan.")
+                return
+
+            status.update(label="✅ Analysis complete", state="complete", expanded=False)
+    except Exception as exc:
+        st.error(f"Analysis failed: {exc}")
+        return
+
+    brain_ph = st.empty()
+    brain_ph.markdown('<div class="brain-overlay">🧠</div>', unsafe_allow_html=True)
+
+    safe_prediction = html.escape(CLASS_NAMES[idx])
+    st.markdown(
+        f"""
+        <div class="nd-result">
+            <div class="nd-result-label">PRIMARY DIAGNOSIS</div>
+            <div class="nd-result-name">{safe_prediction}</div>
+            <hr class="nd-result-divider">
+            <div class="nd-conf-label">Confidence Score</div>
+            <div class="nd-conf-bar">
+                <div class="nd-conf-fill" style="width:{confidence:.1f}%;">
+                    {confidence:.1f}%
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("<br>**Probability breakdown:**", unsafe_allow_html=True)
+    cols = st.columns(4)
+    for i, (class_name, probability) in enumerate(zip(CLASS_NAMES, scores)):
+        with cols[i]:
+            render_probability_card(class_name, float(probability), i == idx)
+
+    st.markdown(
+        """
+        <div class="nd-tip">
+            ⚕️ This result is for research and educational purposes only.
+            Please consult a qualified radiologist before drawing any clinical conclusions.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if CLASS_NAMES[idx] == "No Tumor":
+        st.toast("✅ Analysis complete: No abnormalities detected.", icon="🧠")
+    else:
+        st.toast(f"⚠️ Potential {CLASS_NAMES[idx]} identified.", icon="❗")
+
+    time.sleep(2.5)
+    brain_ph.empty()
+
+
+def render_footer() -> None:
+    st.markdown(
+        """
+        <br><hr style="border-color:#2D3748;margin-top:40px;">
+        <p style="text-align:center;color:#5A6478;font-size:0.82rem;padding-bottom:20px;">
+            Senior Project 2026 &nbsp;|&nbsp; NeuroDetect AI &nbsp;|&nbsp; By Fatima & Yusra
+        </p>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def main() -> None:
+    init_state()
+    sync_state_from_query_params()
+    apply_style(st.session_state.theme)
+
+    if not st.session_state.disclaimer_accepted:
+        render_disclaimer()
         st.stop()
 
-    if os.path.exists("ai_head.png"):
-        img_data = get_base64_image("ai_head.png")
+    render_navbar()
 
-    uploaded_file = st.file_uploader("Upload MRI", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
+    pages = {
+        "landing": render_landing,
+        "docs": render_docs,
+        "faq": render_faq,
+        "portal": render_portal,
+    }
+    pages.get(st.session_state.view, render_landing)()
+    render_footer()
 
-    if uploaded_file:
-        image = Image.open(uploaded_file)
-        st.image(image, caption="Current Patient Scan", use_container_width=True)
 
-        if st.button("🧠 INITIATE NEURAL DIAGNOSTIC"):
-            if model is None:
-                st.error(f"Model not found at: {MODEL_PATH}")
-            else:
-                with st.status("🧬 Analyzing Neural Patterns...", expanded=True) as status:
-                    st.write("Isolating region of interest...")
-
-                    img = image.convert("RGB").resize((256, 256))
-                    img_array = np.array(img).astype("float32")
-                    img_array = np.expand_dims(img_array, axis=0)
-
-                    time.sleep(0.5)
-                    st.write("Extracting deep features...")
-                    preds = model.predict(img_array)
-
-                    time.sleep(0.5)
-                    st.write("Classifying pathology...")
-                    idx = np.argmax(preds[0])
-                    confidence = np.max(preds[0]) * 100
-
-                    if confidence < 80:
-                        status.update(label="❌ Invalid Scan", state="error", expanded=False)
-                        st.error("Invalid scan. Please upload a correct brain MRI scan.")
-                        st.stop()
-
-                    status.update(label="✅ Analysis Complete", state="complete", expanded=False)
-
-                brain_placeholder = st.empty()
-                brain_placeholder.markdown('<div class="brain-overlay">🧠</div>', unsafe_allow_html=True)
-
-                st.markdown(f"""
-                    <div class="hover-card">
-                        <h4 style="color: #4A90E2; margin-bottom: 5px; letter-spacing: 1px;">PRIMARY DIAGNOSIS</h4>
-                        <h1 style="margin: 0; font-size: 2.5rem;">{CLASS_NAMES[idx]}</h1>
-                        <hr style="border: 0; border-top: 1px solid #30363D; margin: 20px 0;">
-                        <p style="font-size: 1rem; color: #8B949E; margin-bottom: 5px;">Confidence Score</p>
-                        <div class="confidence-container">
-                            <div class="confidence-fill" style="width: {confidence}%;">
-                                {confidence:.1f}%
-                            </div>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-
-                st.markdown("\n **Probability Comparison:**")
-                is_dark = st.session_state.theme == 'dark'
-                cols = st.columns(4)
-                for i, (class_name, prob) in enumerate(zip(CLASS_NAMES, preds[0])):
-                    pct = float(prob) * 100
-                    is_top = i == idx
-                    b_color = "#4A90E2" if is_top else ("#2D3748" if is_dark else "#D1D5DB")
-                    t_color = "#4A90E2" if is_top else ("#8B949E" if is_dark else "#4A4A4A")
-                    bg = ("#1A2535" if is_dark else "#E8F0FB") if is_top else ("#1B212C" if is_dark else "#F0F2F6")
-                    with cols[i]:
-                        st.markdown(f"""
-                            <div style="
-                                background: {bg};
-                                border: 2px solid {b_color};
-                                border-radius: 10px;
-                                padding: 20px 10px;
-                                text-align: center;
-                            ">
-                                <div style="font-size: 0.8rem; color: {t_color};
-                                margin-bottom: 8px; font-weight: {'600' if is_top else '400'};">
-                                    {class_name}
-                                </div>
-                                <div style="font-size: 1.4rem; font-weight: bold; color: {t_color};">
-                                    {pct:.1f}%
-                                </div>
-                            </div>
-                        """, unsafe_allow_html=True)
-
-                if CLASS_NAMES[idx] == "No Tumor":
-                    st.toast("✅ Analysis complete: No abnormalities detected.", icon="🧠")
-                else:
-                    st.toast(f"⚠️ Potential {CLASS_NAMES[idx]} identified.", icon="❗")
-
-                time.sleep(2.5)
-                brain_placeholder.empty()
-
-st.markdown("<br><hr><center><p style='color: #666;'>Senior Project 2026 | NeuroDetect AI | Educational Purposes Only</p></center>", unsafe_allow_html=True)
+if __name__ == "__main__":
+    main()
