@@ -518,18 +518,19 @@ def render_navbar() -> None:
         f"""
         <style>
         .st-key-nd_navbar {{
-            position: fixed;
-            top: 14px;
-            left: 50%;
-            transform: translateX(-50%);
+            position: relative;
+            top: auto;
+            left: auto;
+            transform: none;
             z-index: 99999;
-            width: min(760px, calc(100vw - 32px));
+            width: 100%;
             background: transparent !important;
             border: none !important;
             border-radius: 14px;
             padding: 0 !important;
             box-shadow: none !important;
             backdrop-filter: none !important;
+            margin-bottom: 24px;
         }}
         .st-key-nd_navbar div[data-testid="column"] {{
             padding: 0 3px !important;
@@ -730,8 +731,10 @@ def render_docs() -> None:
     st.markdown('<div class="nd-page-title">📄 Project Documentation</div>', unsafe_allow_html=True)
     st.markdown('<div class="nd-page-sub">Technical details and project overview.</div>', unsafe_allow_html=True)
     st.markdown('<div class="nd-doc">', unsafe_allow_html=True)
-    st.markdown(README_PATH.read_text(encoding="utf-8"))
-    
+    if README_PATH.exists():
+        st.markdown(README_PATH.read_text(encoding="utf-8"))
+    else:
+        st.markdown("<p>No README.md found. Add one to your project root.</p>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -925,7 +928,7 @@ def render_footer() -> None:
         """
         <br><hr style="border-color:#2D3748;margin-top:40px;">
         <p style="text-align:center;color:#5A6478;font-size:0.82rem;padding-bottom:20px;">
-            Senior Project 2026 &nbsp;|&nbsp; NeuroDetect AI &nbsp;|&nbsp; By Fatima & Yusra
+            Senior Project 2026 &nbsp;|&nbsp; NeuroDetect AI &nbsp;|&nbsp; By fatima &amp; Yusra
         </p>
         """,
         unsafe_allow_html=True,
