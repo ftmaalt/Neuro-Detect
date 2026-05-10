@@ -32,8 +32,9 @@ This Web application was developed for educational and research purposes only an
 
 ## 📃 Datasets Used
 The model was trained using publicly available Kaggle MRI datasets:
-- <a href="https://www.kaggle.com/datasets/sartajbhuvaji/brain-tumor-classification-mri" >Brain Tumor Classification (MRI)</a>
-- <a href="https://www.kaggle.com/datasets/masoudnickparvar/brain-tumor-mri-dataset">Brain Tumor Classification (MRI)</a>
+- [Brain Tumor Classification MRI](https://www.kaggle.com/datasets/sartajbhuvaji/brain-tumor-classification-mri)
+- [Brain Tumor MRI Dataset](https://www.kaggle.com/datasets/masoudnickparvar/brain-tumor-mri-dataset)
+
 
 ## ⚙️ Tech Tools and Libraries
 
@@ -49,7 +50,7 @@ The model was trained using publicly available Kaggle MRI datasets:
 ## 🚀 How to Run
 
 ### Steps
-1. Open <a href="https://neurodetectai.com/" >NeuroDetect</a> on any web browser
+1. Open [NeuroDetect](https://neurodetectai.com/) on any web browser
 2. Agree to the usage terms
 3. Enter the Diagnostic Portal
 4. Upload a valid brain MRI scan  
@@ -60,6 +61,6 @@ The model was trained using publicly available Kaggle MRI datasets:
 
 **Developed By**
 - Yusra Husain Haji
-- Fatima Mohamed Hasan <br>
-<p align="center"><sub>ITSE498</sub></p>
+- Fatima Mohamed Hasan 
 
+---ITSE498---
