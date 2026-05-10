@@ -1,5 +1,6 @@
 from pathlib import Path
 import html
+import io
 import time
 
 import keras
@@ -29,6 +30,8 @@ def init_state() -> None:
         "view": "landing",
         "disclaimer_accepted": False,
         "accepted_until": 0.0,
+        "uploaded_image_name": None,
+        "uploaded_image_bytes": None,
     }.items():
         st.session_state.setdefault(key, value)
 
@@ -96,7 +99,44 @@ def palette() -> dict[str, str]:
 
 def apply_style() -> None:
     c = palette()
-    active = st.session_state.view if st.session_state.view in {"docs", "faq", "portal"} else "none"
+    is_dark = st.session_state.theme == "dark"
+    active_key = "home" if st.session_state.view == "landing" else st.session_state.view
+    dark_file_chip_rule = (
+        """
+        .st-key-nd_uploader [data-testid="stFileUploader"] *,
+        .st-key-nd_uploader [data-testid="stFileUploader"] *::before,
+        .st-key-nd_uploader [data-testid="stFileUploader"] *::after {
+            background-color: transparent !important;
+            color: #FFFFFF !important;
+            opacity: 1 !important;
+        }
+        .st-key-nd_uploader [data-testid="stFileUploader"] section,
+        .st-key-nd_uploader [data-testid="stFileUploader"] section:hover {
+            background-color: #1B212C !important;
+            border-color: #2D3748 !important;
+        }
+        .st-key-nd_uploader [data-testid="stFileUploaderFile"] {
+            display: none !important;
+        }
+        .st-key-nd_uploader [data-testid="stFileUploader"] div:has(svg),
+        .st-key-nd_uploader [data-testid="stFileUploader"] div:has(svg):hover {
+            background-color: #2D3748 !important;
+            color: #FFFFFF !important;
+            border-radius: 8px !important;
+        }
+        .st-key-nd_uploader [data-testid="stFileUploader"] button,
+        .st-key-nd_uploader [data-testid="stFileUploader"] button:hover,
+        .st-key-nd_uploader [data-testid="baseButton-secondary"],
+        .st-key-nd_uploader [data-testid="baseButton-secondary"]:hover {
+            background-color: #2D3748 !important;
+            color: #FFFFFF !important;
+            border: 1px solid #2D3748 !important;
+            opacity: 1 !important;
+        }
+        """
+        if is_dark
+        else ""
+    )
     st.markdown(
         f"""
         <style>
@@ -142,17 +182,17 @@ def apply_style() -> None:
             color: #4A90E2 !important;
             opacity: 1 !important;
         }}
-        .st-key-nav_landing button {{
-            background: transparent !important;
-            color: {c["text"]} !important;
-            font-size: 1.08rem !important;
-            font-weight: 800 !important;
-            justify-content: flex-start !important;
-            padding-left: 0 !important;
+        .nd-nav-brand {{
+            color: {c["text"]};
+            font-size: 1.08rem;
+            font-weight: 800;
+            line-height: 34px;
+            white-space: nowrap;
         }}
-        .st-key-nav_landing button:hover {{ background: transparent !important; color: #4A90E2 !important; }}
-        .st-key-nav_docs button, .st-key-nav_faq button {{ background: transparent !important; }}
-        .st-key-nav_{active} button {{ background: rgba(74,144,226,0.12) !important; color: #4A90E2 !important; }}
+        .st-key-nav_home button,
+        .st-key-nav_docs button,
+        .st-key-nav_faq button {{ background: transparent !important; }}
+        .st-key-nav_{active_key} button {{ background: rgba(74,144,226,0.12) !important; color: #4A90E2 !important; }}
         .st-key-nav_portal button {{
             background: linear-gradient(90deg, #4A90E2 0%, #E83E8C 100%) !important;
             color: white !important;
@@ -168,9 +208,9 @@ def apply_style() -> None:
         .nd-hero h1 {{ font-size: 3.4rem; font-weight: 800; color: {c["text"]}; margin: 0 0 10px; line-height: 1.1; }}
         .nd-hero p {{ font-size: 1.1rem; color: {c["muted"]}; letter-spacing: 0.18em; margin: 0 0 32px; }}
         .nd-section-title {{ font-size: 1.4rem; font-weight: 700; color: {c["text"]}; margin: 40px 0 16px; text-align: center; }}
-        .nd-about, .nd-doc, .nd-step, .nd-result {{ background: {c["card"]}; border: 1px solid {c["border"]}; color: {c["text"]}; }}
+        .nd-about, .nd-faq, .nd-step, .nd-result {{ background: {c["card"]}; border: 1px solid {c["border"]}; color: {c["text"]}; }}
         .nd-about {{ border-left: 4px solid #4A90E2; border-radius: 14px; padding: 28px 32px; margin-bottom: 12px; }}
-        .nd-about p, .nd-doc p, .nd-step-desc, .nd-page-sub, .nd-tip, .nd-upload-hint {{ color: {c["muted"]}; }}
+        .nd-about p, .nd-faq p, .nd-step-desc, .nd-page-sub, .nd-tip, .nd-upload-hint {{ color: {c["muted"]}; }}
         .nd-about p {{ font-size: 1rem; line-height: 1.75; margin: 0; }}
         .nd-about-title {{ font-size: 1.1rem; font-weight: 700; color: {c["text"]}; margin-bottom: 10px; }}
         .nd-steps {{ display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }}
@@ -183,7 +223,80 @@ def apply_style() -> None:
         .nd-disclaimer p {{ font-size: 1.05rem; color: {c["muted"]}; line-height: 1.7; margin-bottom: 12px; }}
         .nd-upload-hint {{ background: {c["card"]}; border: 1px dashed {c["border"]}; border-radius: 12px; padding: 24px; text-align: center; font-size: 0.9rem; margin-bottom: 8px; }}
         [data-testid="stFileUploader"] section, [data-testid="stFileUploaderFile"] {{ background-color: {c["card"]} !important; border-radius: 12px !important; border: 1px solid {c["border"]} !important; }}
+        [data-testid="stFileUploader"] section:hover,
+        [data-testid="stFileUploaderFile"]:hover {{
+            background-color: {c["card"]} !important;
+            border-color: {c["border"]} !important;
+        }}
         [data-testid="stFileUploader"] section *, [data-testid="stFileUploaderFile"] * {{ color: {c["text"]} !important; }}
+        [data-testid="stFileUploader"] section > div,
+        [data-testid="stFileUploader"] section > div:hover,
+        [data-testid="stFileUploader"] section [data-testid="stFileDropzone"],
+        [data-testid="stFileUploader"] section [data-testid="stFileDropzone"]:hover {{
+            background-color: {c["card"]} !important;
+            color: {c["text"]} !important;
+        }}
+        [data-testid="stFileUploader"] button,
+        [data-testid="stFileUploader"] button:hover,
+        [data-testid="baseButton-secondary"],
+        [data-testid="baseButton-secondary"]:hover {{
+            background: {"#2D3748" if st.session_state.theme == "dark" else "#E8F0FB"} !important;
+            color: {c["text"]} !important;
+            border: 1px solid {c["border"]} !important;
+            border-radius: 8px !important;
+            opacity: 1 !important;
+        }}
+        [data-testid="stFileUploader"] button *,
+        [data-testid="stFileUploader"] button:hover *,
+        [data-testid="baseButton-secondary"] *,
+        [data-testid="baseButton-secondary"]:hover * {{
+            color: {c["text"]} !important;
+            fill: {c["text"]} !important;
+            opacity: 1 !important;
+        }}
+        [data-testid="stFileUploaderFile"] div,
+        [data-testid="stFileUploaderFile"] span,
+        [data-testid="stFileUploaderFile"] small,
+        [data-testid="stFileUploaderFile"] p,
+        [data-testid="stFileUploaderFileName"] {{
+            background-color: transparent !important;
+            color: {c["text"]} !important;
+            opacity: 1 !important;
+        }}
+        [data-testid="stFileUploaderFile"] svg {{
+            color: {c["text"]} !important;
+            fill: {c["text"]} !important;
+            opacity: 1 !important;
+        }}
+        [data-testid="stFileUploaderFile"] button,
+        [data-testid="stFileUploaderFile"] button:hover,
+        [data-testid="stFileUploaderDeleteBtn"],
+        [data-testid="stFileUploaderDeleteBtn"]:hover {{
+            background: transparent !important;
+            border: none !important;
+            color: {c["text"]} !important;
+            box-shadow: none !important;
+            opacity: 1 !important;
+        }}
+        [data-testid="stFileUploaderFile"] button *,
+        [data-testid="stFileUploaderFile"] button:hover *,
+        [data-testid="stFileUploaderDeleteBtn"] *,
+        [data-testid="stFileUploaderDeleteBtn"]:hover * {{
+            color: {c["text"]} !important;
+            fill: {c["text"]} !important;
+            opacity: 1 !important;
+        }}
+        .nd-file-name {{
+            background: {c["card"]};
+            border: 1px solid {c["border"]};
+            border-radius: 8px;
+            color: {c["text"]};
+            font-size: 0.9rem;
+            font-weight: 700;
+            margin: 8px 0 14px;
+            padding: 10px 12px;
+        }}
+        {dark_file_chip_rule}
         [data-testid="stStatusWidget"], [data-testid="stExpander"], div[data-testid="stExpander"] > details, div[data-testid="stExpander"] > details > summary {{ background-color: {c["card"]} !important; color: {c["text"]} !important; border: 1px solid {c["border"]} !important; border-radius: 10px !important; }}
         [data-testid="stStatusWidget"] *, [data-testid="stExpander"] * {{ color: {c["text"]} !important; }}
         .nd-result {{ border-width: 2px; border-radius: 15px; padding: 30px; text-align: center; margin-top: 20px; }}
@@ -194,9 +307,9 @@ def apply_style() -> None:
         .nd-conf-bar {{ background: {c["border"]}; border-radius: 10px; height: 26px; overflow: hidden; }}
         .nd-conf-fill {{ height: 100%; background: linear-gradient(90deg, #4A90E2 0%, #63B3ED 100%); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; color: white; border-radius: 10px; }}
         .nd-tip {{ background: {c["card"]}; border-left: 3px solid #4A90E2; border-radius: 6px; padding: 12px 16px; font-size: 0.85rem; margin-top: 16px; }}
-        .nd-doc {{ border-radius: 12px; padding: 36px 40px; }}
-        .nd-doc h4 {{ color: {c["text"]}; font-size: 1rem; font-weight: 700; margin: 0 0 6px; }}
-        .nd-doc p {{ color: {c["muted"]}; font-size: 0.925rem; line-height: 1.7; margin-bottom: 22px; }}
+        .nd-faq {{ border-radius: 12px; padding: 36px 40px; }}
+        .nd-faq h4 {{ color: {c["text"]}; font-size: 1rem; font-weight: 700; margin: 0 0 6px; }}
+        .nd-faq p {{ color: {c["muted"]}; font-size: 0.925rem; line-height: 1.7; margin-bottom: 22px; }}
         @keyframes brainRotateFade {{ 0% {{ transform: translate(-50%,-50%) rotate(0deg) scale(0.5); opacity: 0; }} 20% {{ transform: translate(-50%,-50%) rotate(72deg) scale(1.2); opacity: 1; }} 80% {{ transform: translate(-50%,-50%) rotate(288deg) scale(1.2); opacity: 1; }} 100% {{ transform: translate(-50%,-50%) rotate(360deg) scale(2); opacity: 0; }} }}
         .brain-overlay {{ position: fixed; top: 50%; left: 50%; z-index: 9999; font-size: 200px; pointer-events: none; animation: brainRotateFade 2.5s ease-in-out forwards; }}
         .nd-page-title {{ font-size: 1.9rem; font-weight: 800; color: {c["text"]}; margin-bottom: 6px; }}
@@ -240,23 +353,25 @@ def render_navbar() -> None:
     theme_label = "☀️" if st.session_state.theme == "dark" else "🌙"
 
     with st.container(key="nd_navbar"):
-        col1, col2, col3, col4, col5 = st.columns(
-            [2.2, 0.8, 0.8, 1.0, 0.5],
+        col1, col2, col3, col4, col5, col6 = st.columns(
+            [1.8, 0.8, 0.8, 0.8, 1.0, 0.5],
             vertical_alignment="center",
         )
         with col1:
-            if st.button("🧠 NeuroDetect", key="nav_landing", use_container_width=True):
-                navigate("landing")
+            st.markdown('<div class="nd-nav-brand">🧠 NeuroDetect</div>', unsafe_allow_html=True)
         with col2:
+            if st.button("Home", key="nav_home", use_container_width=True):
+                navigate("landing")
+        with col3:
             if st.button("Docs", key="nav_docs", use_container_width=True):
                 navigate("docs")
-        with col3:
+        with col4:
             if st.button("FAQ", key="nav_faq", use_container_width=True):
                 navigate("faq")
-        with col4:
+        with col5:
             if st.button("Portal", key="nav_portal", use_container_width=True):
                 navigate("portal")
-        with col5:
+        with col6:
             if st.button(theme_label, key="nav_theme", help="Toggle theme", use_container_width=True):
                 set_theme(next_theme)
 
@@ -372,7 +487,7 @@ def render_faq() -> None:
     st.markdown('<div class="nd-page-sub">Everything you need to know about NeuroDetect.</div>', unsafe_allow_html=True)
     st.markdown(
         """
-        <div class="nd-doc">
+        <div class="nd-faq">
             <h4>What is NeuroDetect?</h4>
             <p>NeuroDetect is a deep learning-based diagnostic support tool designed to classify
             brain tumor MRI scans into Glioma, Meningioma, Pituitary Tumor, or No Tumor.</p>
@@ -445,13 +560,20 @@ def render_portal() -> None:
         render_model_offline()
         return
 
-    uploaded_file = st.file_uploader(
-        "Upload MRI scan (JPG / JPEG / PNG)",
-        type=["jpg", "jpeg", "png"],
-        label_visibility="visible",
-    )
+    uploaded_file = None
+    if st.session_state.uploaded_image_bytes is None:
+        with st.container(key="nd_uploader"):
+            uploaded_file = st.file_uploader(
+                "Upload MRI scan (JPG / JPEG / PNG)",
+                type=["jpg", "jpeg", "png"],
+                label_visibility="visible",
+            )
+        if uploaded_file is not None:
+            st.session_state.uploaded_image_name = uploaded_file.name
+            st.session_state.uploaded_image_bytes = uploaded_file.getvalue()
+            st.rerun()
 
-    if not uploaded_file:
+    if st.session_state.uploaded_image_bytes is None:
         st.markdown(
             """
             <div class="nd-upload-hint">
@@ -463,11 +585,21 @@ def render_portal() -> None:
         )
         return
 
+    st.markdown(
+        f'<div class="nd-file-name">Selected image: {html.escape(st.session_state.uploaded_image_name)}</div>',
+        unsafe_allow_html=True,
+    )
+    if st.button("Choose another image"):
+        st.session_state.uploaded_image_name = None
+        st.session_state.uploaded_image_bytes = None
+        st.rerun()
+
     try:
-        image = Image.open(uploaded_file)
+        image_bytes = io.BytesIO(st.session_state.uploaded_image_bytes)
+        image = Image.open(image_bytes)
         image.verify()
-        uploaded_file.seek(0)
-        image = Image.open(uploaded_file).convert("RGB")
+        image_bytes.seek(0)
+        image = Image.open(image_bytes).convert("RGB")
     except (UnidentifiedImageError, OSError):
         st.error("The uploaded file could not be read as an image. Please upload a valid JPG or PNG scan.")
         return
@@ -549,7 +681,7 @@ def render_footer() -> None:
         """
         <br><hr style="border-color:#2D3748;margin-top:40px;">
         <p style="text-align:center;color:#5A6478;font-size:0.82rem;padding-bottom:20px;">
-            Senior Project 2026 &nbsp;|&nbsp; NeuroDetect AI &nbsp;|&nbsp; By fatima &amp; Yusra
+            Senior Project 2026 &nbsp;|&nbsp; NeuroDetect AI &nbsp;|&nbsp; Developed by Fatima &amp; Yusra
         </p>
         """,
         unsafe_allow_html=True,
