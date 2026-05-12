@@ -2,7 +2,8 @@ from pathlib import Path
 import html
 import io
 import time
-
+import smtplib
+from email.message import EmailMessage
 import keras
 import numpy as np
 import streamlit as st
@@ -16,8 +17,15 @@ MODEL_PATH = BASE_DIR / "models" / "phase2_clean.keras"
 README_PATH = BASE_DIR / "README.md"
 LOGO_PATH = BASE_DIR / "logo.png"
 
+CONTACT_RECEIVER = "info@neurodetectai.com"
+
+SMTP_SERVER = "mail.privateemail.com"
+SMTP_PORT = 465
+SMTP_EMAIL = "info@neurodetectai.com"
+SMTP_PASSWORD = st.secrets["SMTP_PASSWORD"]
+
 CLASS_NAMES = ("Glioma Tumor", "Meningioma Tumor", "No Tumor", "Pituitary Tumor")
-VALID_VIEWS = {"landing", "docs", "faq", "portal"}
+VALID_VIEWS = {"landing", "docs", "faq", "contact", "portal"}
 VALID_THEMES = {"light", "dark"}
 IMAGE_SIZE = (256, 256)
 MIN_CONFIDENCE = 80.0
@@ -191,7 +199,8 @@ def apply_style() -> None:
         }}
         .st-key-nav_home button,
         .st-key-nav_docs button,
-        .st-key-nav_faq button {{ background: transparent !important; }}
+        .st-key-nav_faq button,
+        .st-key-nav_contact button {{ background: transparent !important; }}
         .st-key-nav_{active_key} button {{ background: rgba(74,144,226,0.12) !important; color: #4A90E2 !important; }}
         .st-key-nav_portal button {{
             background: linear-gradient(90deg, #4A90E2 0%, #E83E8C 100%) !important;
@@ -353,8 +362,8 @@ def render_navbar() -> None:
     theme_label = "☀️" if st.session_state.theme == "dark" else "🌙"
 
     with st.container(key="nd_navbar"):
-        col1, col2, col3, col4, col5, col6 = st.columns(
-            [1.8, 0.8, 0.8, 0.8, 1.0, 0.5],
+        col1, col2, col3, col4, col5, col6, col7 = st.columns(
+            [1.55, 0.72, 0.72, 0.72, 0.95, 0.95, 0.5],
             vertical_alignment="center",
         )
         with col1:
@@ -369,9 +378,12 @@ def render_navbar() -> None:
             if st.button("FAQ", key="nav_faq", use_container_width=True):
                 navigate("faq")
         with col5:
+            if st.button("Contact", key="nav_contact", use_container_width=True):
+                navigate("contact")
+        with col6:
             if st.button("Portal", key="nav_portal", use_container_width=True):
                 navigate("portal")
-        with col6:
+        with col7:
             if st.button(theme_label, key="nav_theme", help="Toggle theme", use_container_width=True):
                 set_theme(next_theme)
 
@@ -479,7 +491,7 @@ def render_docs() -> None:
     if README_PATH.exists():
         readme_text = README_PATH.read_text(encoding="utf-8").strip()
         if readme_text:
-            st.markdown(readme_text)
+            st.markdown(readme_text, unsafe_allow_html=True)
 
 
 def render_faq() -> None:
@@ -501,6 +513,77 @@ def render_faq() -> None:
             <p>No. This is a research project, and every finding must be reviewed by a specialist.</p>
             <h4>Is my scan data stored?</h4>
             <p>No. Uploaded scans are used only for temporary in-session processing.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+def send_contact_email(name: str, sender_email: str, subject: str, message: str) -> None:
+        email_msg = EmailMessage()
+        email_msg["Subject"] = f"NeuroDetect Contact Form - {subject}"
+        email_msg["From"] = SMTP_EMAIL
+        email_msg["To"] = CONTACT_RECEIVER
+        email_msg["Reply-To"] = sender_email
+
+        email_msg.set_content(
+            f"""
+    New message from NeuroDetect contact form:
+
+    Name: {name}
+    Email: {sender_email}
+    Subject: {subject}
+
+    Message:
+    {message}
+    """
+        )
+
+        with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as smtp:
+            smtp.login(SMTP_EMAIL, SMTP_PASSWORD)
+            smtp.send_message(email_msg)
+
+def render_contact() -> None:
+    st.markdown('<div class="nd-page-title">📬 Contact Us</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="nd-page-sub">Send project inquiries, feedback, or support questions.</div>',
+        unsafe_allow_html=True,
+    )
+
+    with st.form("contact_form", clear_on_submit=True):
+        name = st.text_input("Name")
+        email = st.text_input("Email")
+        subject = st.selectbox(
+            "Subject",
+            ["General inquiry", "Project feedback", "Technical issue", "Other"],
+        )
+        message = st.text_area("Message", height=150)
+        submitted = st.form_submit_button("Send Message", use_container_width=True)
+
+    if submitted:
+        missing = []
+        if not name.strip():
+            missing.append("name")
+        if not email.strip():
+            missing.append("email")
+        if not message.strip():
+            missing.append("message")
+
+        if missing:
+            st.error(f"Please complete the required field(s): {', '.join(missing)}.")
+        elif "@" not in email or "." not in email:
+            st.error("Please enter a valid email address.")
+        else:
+            st.success("Message received. Thank you for contacting NeuroDetect.")
+        try:
+            send_contact_email(name.strip(), email.strip(), subject, message.strip())
+            st.success("Message sent successfully. Thank you for contacting NeuroDetect.")
+        except Exception as exc:
+            st.error("Message could not be sent. Please try again later.")
+            st.caption(str(exc))
+
+    st.markdown(
+        """
+        <div class="nd-tip">
+            For direct contact, email <a href="mailto:info@neurodetectai.com">info@neurodetectai.com</a>.
         </div>
         """,
         unsafe_allow_html=True,
@@ -681,7 +764,7 @@ def render_footer() -> None:
         """
         <br><hr style="border-color:#2D3748;margin-top:40px;">
         <p style="text-align:center;color:#5A6478;font-size:0.82rem;padding-bottom:20px;">
-            Senior Project 2026 &nbsp;|&nbsp; NeuroDetect AI &nbsp;|&nbsp; Developed by Fatima &amp; Yusra
+            Senior Project 2026 &nbsp;|&nbsp; NeuroDetect AI &nbsp;|&nbsp; By fatima &amp; Yusra
         </p>
         """,
         unsafe_allow_html=True,
@@ -702,6 +785,7 @@ def main() -> None:
         "landing": render_landing,
         "docs": render_docs,
         "faq": render_faq,
+        "contact": render_contact,
         "portal": render_portal,
     }
     pages.get(st.session_state.view, render_landing)()
