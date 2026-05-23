@@ -58,7 +58,7 @@ The model was trained using publicly available Kaggle MRI datasets:
 6. Review the generated results
 
 ## ‼️Limitations
-- Model trained on publicly available datasets only
+- Model is trained on publicly available datasets only
 - Not clinically validated
 - Limited dataset diversity
 - Requires MRI image quality consistency
