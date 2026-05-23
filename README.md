@@ -57,6 +57,12 @@ The model was trained using publicly available Kaggle MRI datasets:
 5. Click **Initiate Neural Diagnostic**  
 6. Review the generated results
 
+## ‼️Limitations
+- Model trained on publicly available datasets only
+- Not clinically validated
+- Limited dataset diversity
+- Requires MRI image quality consistency
+
 ## 👥 Project Team
 
 **Developed By**
